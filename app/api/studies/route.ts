@@ -15,15 +15,16 @@ export async function GET() {
     SELECT 
       s.*,
       (SELECT COUNT(*) FROM participants WHERE study_id = s.id) as participant_count,
-      (SELECT COUNT(*) FROM sessions ss 
-       JOIN participants p ON ss.participant_id = p.id 
-       WHERE p.study_id = s.id AND ss.status = 'completed') as completed_sessions
+      (SELECT COUNT(*) FROM exercise_runs er 
+       JOIN users u ON er.user_id = u.id 
+       JOIN participants p ON p.user_id = u.id
+       WHERE p.study_id = s.id AND er.ended_at IS NOT NULL) as completed_exercises
     FROM studies s
     ORDER BY s.created_at DESC
-  `).all();
+  `).all() as Array<{ id: number; [key: string]: unknown }>;
 
   // Get exercises for each study
-  const studiesWithExercises = studies.map((study: Record<string, unknown>) => {
+  const studiesWithExercises = studies.map((study) => {
     const exercises = db.prepare(`
       SELECT * FROM study_exercises WHERE study_id = ? ORDER BY display_order ASC
     `).all(study.id);
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const study = db.prepare('SELECT * FROM studies WHERE id = ?').get(studyId);
+  const study = db.prepare('SELECT * FROM studies WHERE id = ?').get(studyId) as Record<string, unknown>;
   const studyExercises = db.prepare('SELECT * FROM study_exercises WHERE study_id = ?').all(studyId);
 
   return NextResponse.json({ study: { ...study, exercises: studyExercises } });

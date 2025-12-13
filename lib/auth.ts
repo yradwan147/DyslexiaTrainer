@@ -55,7 +55,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.role = user.role;
         token.userId = user.id;
-        token.childCode = user.childCode;
+        token.childCode = user.childCode || undefined;
       }
       return token;
     },
