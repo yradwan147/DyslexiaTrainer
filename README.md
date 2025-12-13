@@ -92,7 +92,7 @@ npm start
 
 ### Environment Variables
 
-Create `.env.local`:
+Create `.env.local` for local development:
 
 ```env
 NEXTAUTH_URL=http://localhost:3000
@@ -100,14 +100,30 @@ NEXTAUTH_SECRET=your-secret-key-here
 DATABASE_PATH=./data/database.sqlite
 ```
 
-### Deployment Platforms
+### Railway Deployment
+
+1. **Connect your repo** to Railway
+2. **Set environment variables** in Railway dashboard:
+   ```
+   NEXTAUTH_URL=https://your-app.railway.app
+   NEXTAUTH_SECRET=generate-a-secure-random-string
+   ```
+3. **Add a volume** (optional but recommended for persistent data):
+   - Mount path: `/app/data`
+   - Set env: `DATABASE_PATH=/app/data/database.sqlite`
+
+**Note:** The database auto-initializes with demo users on first run. Demo credentials work immediately after deployment:
+- Child: `DEMO01` / `1234`
+- Admin: `admin@research.edu` / `admin123`
+
+### Other Deployment Platforms
 
 Compatible with:
-- Vercel (recommended)
-- Railway
+- Vercel (requires external database)
+- Railway ✓
 - Render
 - DigitalOcean App Platform
-- Any Node.js host
+- Any Node.js host with persistent storage
 
 ## Database
 
