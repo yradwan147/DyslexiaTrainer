@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Chick hatching from egg like in reference image 4 -->
+  <!-- Egg shell (broken) - white with black outline -->
+  <path d="M20 65 Q15 45 30 35 Q45 25 55 35 Q65 45 60 55" fill="#fff" stroke="#000" stroke-width="2"/>
+  <path d="M60 55 L65 48 L58 52" fill="#fff" stroke="#000" stroke-width="2"/>
+  <!-- Egg bottom -->
+  <path d="M20 65 Q25 85 40 90 Q55 85 60 75 Q62 70 60 55" fill="#fff" stroke="#000" stroke-width="2"/>
+  <!-- Chick body (black silhouette) -->
+  <ellipse cx="50" cy="55" rx="18" ry="15" fill="#000"/>
+  <!-- Chick head -->
+  <circle cx="55" cy="38" r="12" fill="#000"/>
+  <!-- Eye (white) -->
+  <circle cx="60" cy="36" r="3" fill="#fff"/>
+  <circle cx="61" cy="36" r="1.5" fill="#000"/>
+  <!-- Beak -->
+  <polygon points="68,38 78,40 68,43" fill="#f59e0b"/>
+  <!-- Tuft on head -->
+  <path d="M50 26 Q52 18 55 24 Q57 16 60 22" fill="#000"/>
+</svg>

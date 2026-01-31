@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Lion like in reference image 2 - orange roaring lion -->
+  <!-- Mane -->
+  <circle cx="35" cy="40" r="28" fill="#d97706"/>
+  <!-- Mane detail (spiky) -->
+  <path d="M10 30 Q5 25 12 20 Q8 15 18 15 Q15 8 25 12 Q25 5 35 10 Q38 3 45 10 Q52 5 55 12 Q62 8 60 18 Q68 15 65 25 Q72 28 65 35" fill="#b45309"/>
+  <!-- Face -->
+  <ellipse cx="40" cy="45" rx="18" ry="16" fill="#fbbf24"/>
+  <!-- Ears -->
+  <circle cx="20" cy="28" r="6" fill="#fbbf24"/>
+  <circle cx="20" cy="28" r="3" fill="#f97316"/>
+  <!-- Eyes -->
+  <ellipse cx="33" cy="42" rx="4" ry="3" fill="#fff"/>
+  <circle cx="34" cy="42" r="2" fill="#333"/>
+  <ellipse cx="47" cy="42" rx="4" ry="3" fill="#fff"/>
+  <circle cx="48" cy="42" r="2" fill="#333"/>
+  <!-- Nose -->
+  <ellipse cx="40" cy="50" rx="4" ry="3" fill="#333"/>
+  <!-- Open mouth (roaring) -->
+  <path d="M30 55 Q40 70 50 55" fill="#dc2626"/>
+  <path d="M32 55 L32 60" stroke="#fff" stroke-width="2"/>
+  <path d="M40 55 L40 62" stroke="#fff" stroke-width="2"/>
+  <path d="M48 55 L48 60" stroke="#fff" stroke-width="2"/>
+  <!-- Body -->
+  <ellipse cx="65" cy="65" rx="25" ry="18" fill="#fbbf24" stroke="#d97706" stroke-width="1"/>
+  <!-- Front legs -->
+  <rect x="50" y="75" width="8" height="18" fill="#fbbf24" stroke="#d97706" stroke-width="1"/>
+  <rect x="62" y="75" width="8" height="18" fill="#fbbf24" stroke="#d97706" stroke-width="1"/>
+  <!-- Paws -->
+  <ellipse cx="54" cy="93" rx="5" ry="3" fill="#fbbf24" stroke="#d97706"/>
+  <ellipse cx="66" cy="93" rx="5" ry="3" fill="#fbbf24" stroke="#d97706"/>
+  <!-- Tail -->
+  <path d="M90 60 Q98 55 95 70" stroke="#fbbf24" stroke-width="4" fill="none"/>
+  <circle cx="95" cy="72" r="4" fill="#b45309"/>
+</svg>

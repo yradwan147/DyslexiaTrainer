@@ -1,119 +1,309 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import type { ExerciseProps, MazeTrackingTrialConfig } from '@/lib/exercises/types';
+import type { ExerciseProps } from '@/lib/exercises/types';
+import { 
+  MAZE_CONFIGS, 
+  type MazeConfig, 
+  type WallSegment,
+  getCharacterEmoji,
+  getCollectibleEmoji 
+} from '@/lib/exercises/mazeTrackingData';
+
+const MAZES_PER_SESSION = 5;
 
 export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: ExerciseProps) {
-  const [currentPos, setCurrentPos] = useState<[number, number]>([0, 0]);
-  const [path, setPath] = useState<[number, number][]>([[0, 0]]);
-  const [hasResponded, setHasResponded] = useState(false);
+  const [clickedCollectibles, setClickedCollectibles] = useState<Set<number>>(new Set());
+  const [nextExpectedOrder, setNextExpectedOrder] = useState(1);
+  const [wrongClicks, setWrongClicks] = useState(0);
+  const [showWrongFeedback, setShowWrongFeedback] = useState<{ row: number; col: number } | null>(null);
+  const [isComplete, setIsComplete] = useState(false);
+  const [currentMaze, setCurrentMaze] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
 
-  const trial = config.trials[currentTrialIndex] as MazeTrackingTrialConfig;
-  const { maze_width, maze_height, maze_cells, start_position, end_position, stimulus_duration_ms } = trial;
+  // Get maze configuration - each maze uses a DIFFERENT configuration
+  // Progress through all 15 mazes, cycling if needed
+  const configIndex = currentMaze % MAZE_CONFIGS.length;
+  const mazeConfig = MAZE_CONFIGS[configIndex];
 
-  const cellSize = Math.min(60, 500 / Math.max(maze_width, maze_height));
+  const { gridSize, walls, collectibles, characterType, characterPosition, collectibleType } = mazeConfig;
+  
+  // Calculate cell size based on grid size
+  const mazeSize = 450;
+  const cellSize = mazeSize / gridSize;
 
-  // Reset on trial change
+  // Reset on maze change
   useEffect(() => {
-    setHasResponded(false);
-    setCurrentPos(start_position);
-    setPath([start_position]);
+    setClickedCollectibles(new Set());
+    setNextExpectedOrder(1);
+    setShowWrongFeedback(null);
+    setIsComplete(false);
+  }, [currentMaze]);
+
+  // Reset everything on new trial
+  useEffect(() => {
+    setClickedCollectibles(new Set());
+    setNextExpectedOrder(1);
+    setWrongClicks(0);
+    setShowWrongFeedback(null);
+    setIsComplete(false);
+    setCurrentMaze(0);
     startTimeRef.current = Date.now();
-  }, [currentTrialIndex, start_position]);
+  }, [currentTrialIndex]);
 
-  // Handle cell click
-  const handleCellClick = useCallback((x: number, y: number) => {
-    if (hasResponded) return;
-    if (maze_cells[y][x] === 0) return; // Wall
+  // Find collectible at position
+  const getCollectibleAt = useCallback((row: number, col: number) => {
+    return collectibles.find(c => c.row === row && c.col === col);
+  }, [collectibles]);
 
-    // Check if adjacent to current position
-    const dx = Math.abs(x - currentPos[0]);
-    const dy = Math.abs(y - currentPos[1]);
-    if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-      setCurrentPos([x, y]);
-      setPath(prev => [...prev, [x, y]]);
+  // Handle collectible click
+  const handleCollectibleClick = useCallback((row: number, col: number) => {
+    if (isComplete) return;
+    
+    const collectible = getCollectibleAt(row, col);
+    if (!collectible) return;
+    
+    // Already clicked
+    if (clickedCollectibles.has(collectible.order)) return;
 
-      // Check if reached end
-      if (x === end_position[0] && y === end_position[1]) {
-        setHasResponded(true);
-        const responseTime = Date.now() - startTimeRef.current;
-        
-        onTrialComplete({
-          trial_index: currentTrialIndex,
-          user_response: JSON.stringify([...path, [x, y]]),
-          response_time_ms: responseTime,
-          is_correct: true,
-          is_timed_out: false,
-          is_skipped: false,
-          started_at: new Date(startTimeRef.current).toISOString(),
-          responded_at: new Date().toISOString(),
-        });
+    if (collectible.order === nextExpectedOrder) {
+      // Correct order
+      const newClicked = new Set(clickedCollectibles);
+      newClicked.add(collectible.order);
+      setClickedCollectibles(newClicked);
+      setNextExpectedOrder(prev => prev + 1);
+
+      // Check if all collectibles collected
+      if (newClicked.size === collectibles.length) {
+        setIsComplete(true);
+        setTimeout(() => {
+          const nextMaze = currentMaze + 1;
+          
+          if (nextMaze >= MAZES_PER_SESSION) {
+            // Session complete
+            onTrialComplete({
+              trial_index: currentTrialIndex,
+              user_response: JSON.stringify({ 
+                mazesCompleted: nextMaze,
+                wrongClicks,
+                configId: mazeConfig.id
+              }),
+              response_time_ms: Date.now() - startTimeRef.current,
+              is_correct: true,
+              is_timed_out: false,
+              is_skipped: false,
+              started_at: new Date(startTimeRef.current).toISOString(),
+              responded_at: new Date().toISOString(),
+            });
+          } else {
+            // Next maze
+            setCurrentMaze(nextMaze);
+          }
+        }, 1000);
       }
+    } else {
+      // Wrong order
+      setWrongClicks(prev => prev + 1);
+      setShowWrongFeedback({ row, col });
+      setTimeout(() => setShowWrongFeedback(null), 500);
     }
-  }, [hasResponded, maze_cells, currentPos, end_position, path, currentTrialIndex, onTrialComplete]);
+  }, [isComplete, getCollectibleAt, clickedCollectibles, nextExpectedOrder, collectibles.length, wrongClicks, currentTrialIndex, currentMaze, mazeConfig.id, onTrialComplete]);
 
-  // Timeout handler
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!hasResponded) {
-        onTrialComplete({
-          trial_index: currentTrialIndex,
-          user_response: JSON.stringify(path),
-          response_time_ms: stimulus_duration_ms,
-          is_correct: false,
-          is_timed_out: true,
-          is_skipped: false,
-          started_at: new Date(startTimeRef.current).toISOString(),
-          responded_at: new Date().toISOString(),
-        });
+  // Get character start position based on characterPosition
+  const getCharacterPos = (): { row: number; col: number } | null => {
+    switch (characterPosition) {
+      case 'top-left': return { row: -0.5, col: -0.5 };
+      case 'left': return { row: Math.floor(gridSize / 2), col: -0.5 };
+      case 'bottom-right': return { row: gridSize - 0.5, col: gridSize + 0.5 };
+      default: return null;
+    }
+  };
+
+  const characterPos = getCharacterPos();
+
+  // Render wall segments as SVG paths
+  const renderWalls = () => {
+    return walls.map((wall, idx) => {
+      const { type, row, col, length } = wall;
+      
+      if (type === 'h') {
+        // Horizontal wall
+        const x1 = col * cellSize;
+        const y1 = row * cellSize;
+        const x2 = (col + length) * cellSize;
+        const y2 = row * cellSize;
+        return (
+          <line
+            key={`wall-${idx}`}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke="#1e293b"
+            strokeWidth={3}
+            strokeLinecap="round"
+          />
+        );
+      } else {
+        // Vertical wall
+        const x1 = col * cellSize;
+        const y1 = row * cellSize;
+        const x2 = col * cellSize;
+        const y2 = (row + length) * cellSize;
+        return (
+          <line
+            key={`wall-${idx}`}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke="#1e293b"
+            strokeWidth={3}
+            strokeLinecap="round"
+          />
+        );
       }
-    }, stimulus_duration_ms);
+    });
+  };
 
-    return () => clearTimeout(timeout);
-  }, [stimulus_duration_ms, hasResponded, currentTrialIndex, path, onTrialComplete]);
+  // Render collectibles
+  const renderCollectibles = () => {
+    return collectibles.map((collectible, idx) => {
+      const { row, col, order } = collectible;
+      const isClicked = clickedCollectibles.has(order);
+      const isNext = order === nextExpectedOrder;
+      const isLast = order === collectibles.length;
+      const hasWrongFeedback = showWrongFeedback?.row === row && showWrongFeedback?.col === col;
+      
+      const cx = (col + 0.5) * cellSize;
+      const cy = (row + 0.5) * cellSize;
+      
+      return (
+        <g key={`collectible-${idx}`}>
+          {/* Background circle for highlighting */}
+          {isNext && !isClicked && (
+            <circle
+              cx={cx}
+              cy={cy}
+              r={cellSize * 0.4}
+              fill="rgba(250, 204, 21, 0.3)"
+              stroke="#facc15"
+              strokeWidth={2}
+              className="animate-pulse"
+            />
+          )}
+          {hasWrongFeedback && (
+            <circle
+              cx={cx}
+              cy={cy}
+              r={cellSize * 0.4}
+              fill="rgba(239, 68, 68, 0.3)"
+            />
+          )}
+          {/* Clickable area */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={cellSize * 0.35}
+            fill={isClicked ? 'rgba(34, 197, 94, 0.2)' : 'transparent'}
+            stroke="transparent"
+            className={!isClicked ? 'cursor-pointer hover:fill-yellow-100' : ''}
+            onClick={() => handleCollectibleClick(row, col)}
+          />
+          {/* Emoji */}
+          <text
+            x={cx}
+            y={cy}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={cellSize * 0.5}
+            style={{ pointerEvents: 'none' }}
+          >
+            {isClicked ? '✅' : (hasWrongFeedback ? '❌' : getCollectibleEmoji(collectibleType, isLast))}
+          </text>
+        </g>
+      );
+    });
+  };
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <h2 className="text-white text-2xl font-bold">Navigate from 🟢 to 🏁</h2>
+      <h2 className="text-white text-2xl font-bold">Find the Path & Collect Treasures!</h2>
       
-      <div 
-        className="grid gap-1 bg-slate-800 p-4 rounded-2xl"
-        style={{ 
-          gridTemplateColumns: `repeat(${maze_width}, ${cellSize}px)`,
-        }}
-      >
-        {maze_cells.map((row, y) =>
-          row.map((cell, x) => {
-            const isStart = x === start_position[0] && y === start_position[1];
-            const isEnd = x === end_position[0] && y === end_position[1];
-            const isCurrent = x === currentPos[0] && y === currentPos[1];
-            const isPath = path.some(([px, py]) => px === x && py === y);
-            const isWall = cell === 0;
+      <div className="text-slate-400 text-sm flex gap-6">
+        <span>Maze: {currentMaze + 1} / {MAZES_PER_SESSION}</span>
+        <span>Collected: {clickedCollectibles.size} / {collectibles.length}</span>
+        <span>Wrong clicks: {wrongClicks}</span>
+        <span>Config: {mazeConfig.id}</span>
+      </div>
 
-            return (
-              <div
-                key={`${x}-${y}`}
-                onClick={() => handleCellClick(x, y)}
-                className={`
-                  flex items-center justify-center text-2xl transition-all
-                  ${isWall ? 'bg-slate-700' : 'bg-slate-600 cursor-pointer hover:bg-slate-500'}
-                  ${isPath && !isStart && !isEnd ? 'bg-primary-500/50' : ''}
-                  ${isCurrent ? 'ring-4 ring-primary-400' : ''}
-                `}
-                style={{ width: cellSize, height: cellSize }}
-              >
-                {isStart && '🟢'}
-                {isEnd && '🏁'}
-                {isCurrent && !isStart && !isEnd && '👤'}
-              </div>
-            );
-          })
+      <p className="text-slate-300 text-sm max-w-md text-center">
+        Follow the path with your eyes from the {getCharacterEmoji(characterType)} and click the {collectibleType}s in order!
+      </p>
+
+      {/* Maze SVG */}
+      <div className="relative bg-white rounded-lg p-4 shadow-lg">
+        <svg
+          width={mazeSize}
+          height={mazeSize}
+          viewBox={`0 0 ${mazeSize} ${mazeSize}`}
+          className="border-2 border-slate-800"
+        >
+          {/* Background */}
+          <rect x={0} y={0} width={mazeSize} height={mazeSize} fill="white" />
+          
+          {/* Grid lines (light) */}
+          {Array.from({ length: gridSize + 1 }).map((_, i) => (
+            <g key={`grid-${i}`}>
+              <line
+                x1={0}
+                y1={i * cellSize}
+                x2={mazeSize}
+                y2={i * cellSize}
+                stroke="#e2e8f0"
+                strokeWidth={0.5}
+              />
+              <line
+                x1={i * cellSize}
+                y1={0}
+                x2={i * cellSize}
+                y2={mazeSize}
+                stroke="#e2e8f0"
+                strokeWidth={0.5}
+              />
+            </g>
+          ))}
+          
+          {/* Walls */}
+          {renderWalls()}
+          
+          {/* Collectibles */}
+          {renderCollectibles()}
+        </svg>
+        
+        {/* Character (outside maze) */}
+        {characterPos && (
+          <div
+            className="absolute text-3xl"
+            style={{
+              left: characterPos.col < 0 ? -40 : (characterPos.col >= gridSize ? mazeSize + 20 : characterPos.col * cellSize),
+              top: characterPos.row < 0 ? -40 : (characterPos.row >= gridSize ? mazeSize + 20 : characterPos.row * cellSize),
+            }}
+          >
+            {getCharacterEmoji(characterType)}
+          </div>
         )}
       </div>
-      
-      <p className="text-slate-400">Click adjacent cells to move</p>
+
+      {isComplete && (
+        <div className="text-green-400 text-xl font-bold animate-pulse">
+          🎉 Maze Complete! 🎉
+        </div>
+      )}
+
+      <p className="text-slate-500 text-xs">
+        Hint: Click on the items in order (1st, 2nd, 3rd...). The next one has a yellow highlight.
+      </p>
     </div>
   );
 }
-

@@ -13,10 +13,9 @@ import { LineTracking } from './LineTracking';
 import { MazeTracking } from './MazeTracking';
 import { DynamicFootball } from './DynamicFootball';
 import { DynamicTennis } from './DynamicTennis';
-import { DynamicCircles } from './DynamicCircles';
 import { VisualSaccades } from './VisualSaccades';
 import { VisualMemory } from './VisualMemory';
-import { PairSearch } from './PairSearch';
+import { VisualDiscrimination } from './VisualDiscrimination';
 
 interface ExerciseRunnerProps {
   config: ExerciseConfig;
@@ -112,14 +111,12 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
         return <DynamicFootball {...exerciseProps} />;
       case 'dynamic_tennis':
         return <DynamicTennis {...exerciseProps} />;
-      case 'dynamic_circles':
-        return <DynamicCircles {...exerciseProps} />;
       case 'visual_saccades':
         return <VisualSaccades {...exerciseProps} />;
       case 'visual_memory':
         return <VisualMemory {...exerciseProps} />;
-      case 'pair_search':
-        return <PairSearch {...exerciseProps} />;
+      case 'visual_discrimination':
+        return <VisualDiscrimination {...exerciseProps} />;
       default:
         return <div>Unknown exercise type</div>;
     }

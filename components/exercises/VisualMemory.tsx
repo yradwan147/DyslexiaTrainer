@@ -1,140 +1,236 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import type { ExerciseProps, VisualMemoryTrialConfig } from '@/lib/exercises/types';
+import type { ExerciseProps } from '@/lib/exercises/types';
+import { 
+  MEMORY_SEQUENCES, 
+  getItemEmoji, 
+  getAllUniqueItems,
+  type MemorySequence 
+} from '@/lib/exercises/visualMemoryData';
 
-type Phase = 'showing' | 'input' | 'complete';
+type Phase = 'showing' | 'input' | 'feedback' | 'complete';
+
+const DISPLAY_TIME_MS = 10000; // 10 seconds to view all images
+const ITEMS_PER_SESSION = 5;
+const MAX_RETRIES = 5;
 
 export function VisualMemory({ config, currentTrialIndex, onTrialComplete }: ExerciseProps) {
   const [phase, setPhase] = useState<Phase>('showing');
-  const [currentShowIndex, setCurrentShowIndex] = useState(0);
-  const [userSequence, setUserSequence] = useState<number[]>([]);
+  const [userSequence, setUserSequence] = useState<string[]>([]);
+  const [currentItem, setCurrentItem] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const [showCorrect, setShowCorrect] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(DISPLAY_TIME_MS / 1000);
+  const [availableItems, setAvailableItems] = useState<string[]>([]);
   const startTimeRef = useRef<number>(Date.now());
 
-  const trial = config.trials[currentTrialIndex] as VisualMemoryTrialConfig;
-  const { sequence, display_time_per_item_ms, image_set } = trial;
+  // Get sequence - each item uses a DIFFERENT sequence
+  // Progress through all sequences, cycling if needed
+  const sequenceIndex = currentItem % MEMORY_SEQUENCES.length;
+  const currentSequence = MEMORY_SEQUENCES[sequenceIndex];
 
-  // Reset on trial change
+  // Reset on trial/item change
   useEffect(() => {
     startTimeRef.current = Date.now();
     setPhase('showing');
-    setCurrentShowIndex(0);
     setUserSequence([]);
-  }, [currentTrialIndex]);
+    setTimeRemaining(DISPLAY_TIME_MS / 1000);
+    setShowCorrect(false);
+    // Generate available items for selection
+    setAvailableItems(getAllUniqueItems(currentSequence));
+  }, [currentTrialIndex, currentItem, currentSequence]);
 
-  // Show sequence
+  // Countdown timer during showing phase
   useEffect(() => {
     if (phase !== 'showing') return;
 
-    const showNext = () => {
-      if (currentShowIndex >= sequence.length) {
-        // Done showing, switch to input
-        setTimeout(() => setPhase('input'), 500);
-        return;
-      }
+    const interval = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          setPhase('input');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-      const timer = setTimeout(() => {
-        setCurrentShowIndex(prev => prev + 1);
-      }, display_time_per_item_ms);
-
-      return () => clearTimeout(timer);
-    };
-
-    const cleanup = showNext();
-    return cleanup;
-  }, [phase, currentShowIndex, sequence.length, display_time_per_item_ms]);
+    return () => clearInterval(interval);
+  }, [phase]);
 
   // Handle item selection
-  const handleSelect = useCallback((itemIndex: number) => {
+  const handleSelect = useCallback((item: string) => {
     if (phase !== 'input') return;
 
-    const newSequence = [...userSequence, itemIndex];
+    const newSequence = [...userSequence, item];
     setUserSequence(newSequence);
 
-    if (newSequence.length >= sequence.length) {
-      // Check correctness
-      const correctCount = newSequence.filter((item, idx) => item === sequence[idx]).length;
-      const isCorrect = correctCount === sequence.length;
-
-      onTrialComplete({
-        trial_index: currentTrialIndex,
-        user_response: JSON.stringify(newSequence),
-        response_time_ms: Date.now() - startTimeRef.current,
-        is_correct: isCorrect,
-        is_timed_out: false,
-        is_skipped: false,
-        started_at: new Date(startTimeRef.current).toISOString(),
-        responded_at: new Date().toISOString(),
-      });
+    // Check if sequence is complete
+    if (newSequence.length >= currentSequence.sequence.length) {
+      const isCorrect = newSequence.every((item, idx) => item === currentSequence.sequence[idx]);
+      
+      if (isCorrect) {
+        setShowCorrect(true);
+        setPhase('feedback');
+        
+        setTimeout(() => {
+          const newItem = currentItem + 1;
+          
+          if (newItem >= ITEMS_PER_SESSION) {
+            // Session complete
+            onTrialComplete({
+              trial_index: currentTrialIndex,
+              user_response: JSON.stringify({ 
+                completed: ITEMS_PER_SESSION, 
+                retries: retryCount 
+              }),
+              response_time_ms: Date.now() - startTimeRef.current,
+              is_correct: true,
+              is_timed_out: false,
+              is_skipped: false,
+              started_at: new Date(startTimeRef.current).toISOString(),
+              responded_at: new Date().toISOString(),
+            });
+          } else {
+            // Next item
+            setCurrentItem(newItem);
+            setRetryCount(0);
+          }
+        }, 1500);
+      } else {
+        // Wrong - retry or move on
+        setShowCorrect(false);
+        setPhase('feedback');
+        
+        setTimeout(() => {
+          if (retryCount + 1 >= MAX_RETRIES) {
+            // Max retries reached, move to next
+            const newItem = currentItem + 1;
+            
+            if (newItem >= ITEMS_PER_SESSION) {
+              onTrialComplete({
+                trial_index: currentTrialIndex,
+                user_response: JSON.stringify({ 
+                  completed: currentItem, 
+                  retries: retryCount + 1 
+                }),
+                response_time_ms: Date.now() - startTimeRef.current,
+                is_correct: false,
+                is_timed_out: false,
+                is_skipped: false,
+                started_at: new Date(startTimeRef.current).toISOString(),
+                responded_at: new Date().toISOString(),
+              });
+            } else {
+              setCurrentItem(newItem);
+              setRetryCount(0);
+            }
+          } else {
+            // Retry same sequence
+            setRetryCount(prev => prev + 1);
+            setUserSequence([]);
+            setPhase('showing');
+            setTimeRemaining(DISPLAY_TIME_MS / 1000);
+          }
+        }, 1500);
+      }
     }
-  }, [phase, userSequence, sequence, currentTrialIndex, onTrialComplete]);
+  }, [phase, userSequence, currentSequence, currentItem, retryCount, currentTrialIndex, onTrialComplete]);
 
-  // Clear last selection
+  // Undo last selection
   const handleUndo = useCallback(() => {
-    setUserSequence(prev => prev.slice(0, -1));
-  }, []);
+    if (phase === 'input' && userSequence.length > 0) {
+      setUserSequence(prev => prev.slice(0, -1));
+    }
+  }, [phase, userSequence]);
 
   return (
     <div className="flex flex-col items-center gap-6">
       <h2 className="text-white text-2xl font-bold">
-        {phase === 'showing' ? 'Remember this sequence!' : 'Repeat the sequence in order'}
+        {phase === 'showing' ? 'Remember these images!' : 
+         phase === 'feedback' ? (showCorrect ? 'Correct!' : 'Try again!') :
+         'Select the images in order'}
       </h2>
 
-      {/* Display area */}
-      <div className="min-h-[150px] flex items-center justify-center">
-        {phase === 'showing' && currentShowIndex < sequence.length && (
-          <div className="text-8xl animate-pulse">
-            {image_set[sequence[currentShowIndex]]}
-          </div>
+      <div className="text-slate-400 text-sm flex gap-6">
+        <span>Item: {currentItem + 1} / {ITEMS_PER_SESSION}</span>
+        <span>Sequence length: {currentSequence.sequence.length}</span>
+        {retryCount > 0 && <span>Attempt: {retryCount + 1} / {MAX_RETRIES}</span>}
+      </div>
+
+      {/* Display area - show ALL images simultaneously */}
+      <div className="min-h-[180px] flex flex-col items-center justify-center gap-4">
+        {phase === 'showing' && (
+          <>
+            {/* Timer */}
+            <div className="text-slate-400 text-lg">
+              Time remaining: {timeRemaining}s
+            </div>
+            
+            {/* All images displayed in a row */}
+            <div className="flex gap-4 p-4 bg-slate-800 rounded-2xl">
+              {currentSequence.sequence.map((item, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex flex-col items-center gap-2"
+                >
+                  <div className="text-6xl p-3 bg-slate-700 rounded-xl">
+                    {getItemEmoji(item)}
+                  </div>
+                  <span className="text-slate-500 text-xs">{idx + 1}</span>
+                </div>
+              ))}
+            </div>
+            
+            <p className="text-slate-400 text-sm">
+              Remember the order from left to right!
+            </p>
+          </>
         )}
-        
-        {phase === 'showing' && currentShowIndex >= sequence.length && (
-          <div className="text-white text-xl">Get ready...</div>
-        )}
-        
+
         {phase === 'input' && (
-          <div className="flex gap-4">
-            {userSequence.map((item, idx) => (
-              <div key={idx} className="text-5xl p-2 bg-slate-700 rounded-xl">
-                {image_set[item]}
-              </div>
-            ))}
-            {userSequence.length < sequence.length && (
-              <div className="w-16 h-16 border-4 border-dashed border-slate-500 rounded-xl flex items-center justify-center text-slate-500">
-                {userSequence.length + 1}
-              </div>
-            )}
+          <>
+            {/* User's current selection */}
+            <div className="flex gap-3 mb-4">
+              {userSequence.map((item, idx) => (
+                <div key={idx} className="text-5xl p-2 bg-slate-700 rounded-xl">
+                  {getItemEmoji(item)}
+                </div>
+              ))}
+              {userSequence.length < currentSequence.sequence.length && (
+                <div className="w-16 h-16 border-4 border-dashed border-slate-500 rounded-xl flex items-center justify-center text-slate-500">
+                  {userSequence.length + 1}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {phase === 'feedback' && (
+          <div className={`text-6xl ${showCorrect ? 'text-green-500' : 'text-red-500'}`}>
+            {showCorrect ? '✓' : '✗'}
           </div>
         )}
       </div>
 
-      {/* Progress indicator */}
-      {phase === 'showing' && (
-        <div className="flex gap-2">
-          {sequence.map((_, idx) => (
-            <div
-              key={idx}
-              className={`w-4 h-4 rounded-full ${
-                idx < currentShowIndex ? 'bg-primary-500' : 
-                idx === currentShowIndex ? 'bg-primary-300 animate-pulse' : 'bg-slate-600'
-              }`}
-            />
-          ))}
-        </div>
-      )}
-
       {/* Selection grid */}
       {phase === 'input' && (
         <>
-          <div className="grid grid-cols-4 gap-4">
-            {image_set.map((item, idx) => (
+          <div className="grid grid-cols-4 gap-3 max-w-lg">
+            {availableItems.map((item, idx) => (
               <button
                 key={idx}
-                onClick={() => handleSelect(idx)}
-                className="text-5xl p-4 bg-slate-700 rounded-xl hover:bg-slate-600 
-                           active:scale-95 transition-all"
+                onClick={() => handleSelect(item)}
+                disabled={userSequence.includes(item)}
+                className={`
+                  text-4xl p-3 rounded-xl transition-all
+                  ${userSequence.includes(item) 
+                    ? 'bg-slate-800 opacity-50 cursor-not-allowed' 
+                    : 'bg-slate-700 hover:bg-slate-600 active:scale-95 cursor-pointer'
+                  }
+                `}
               >
-                {item}
+                {getItemEmoji(item)}
               </button>
             ))}
           </div>
@@ -149,7 +245,14 @@ export function VisualMemory({ config, currentTrialIndex, onTrialComplete }: Exe
           )}
         </>
       )}
+
+      <p className="text-slate-500 text-xs max-w-md text-center">
+        Level {currentSequence.level}: {
+          currentSequence.level === 1 ? 'Visually different items' :
+          currentSequence.level === 2 ? 'Visually similar, different categories' :
+          'Visually similar, same category'
+        }
+      </p>
     </div>
   );
 }
-

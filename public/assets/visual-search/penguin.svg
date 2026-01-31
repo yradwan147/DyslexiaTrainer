@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Penguin silhouette - black -->
+  <!-- Body - oval, slightly tilted -->
+  <ellipse cx="50" cy="55" rx="22" ry="32" fill="black"/>
+  <!-- Head -->
+  <ellipse cx="52" cy="20" rx="14" ry="12" fill="black"/>
+  <!-- Beak -->
+  <path d="M40 22 L30 26 L40 28" fill="black"/>
+  <!-- Flippers -->
+  <path d="M28 45 Q18 55 22 70" fill="none" stroke="black" stroke-width="8" stroke-linecap="round"/>
+  <path d="M72 45 Q82 55 78 70" fill="none" stroke="black" stroke-width="8" stroke-linecap="round"/>
+  <!-- Feet -->
+  <ellipse cx="38" cy="88" rx="10" ry="5" fill="black"/>
+  <ellipse cx="62" cy="88" rx="10" ry="5" fill="black"/>
+</svg>

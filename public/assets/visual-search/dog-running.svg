@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Dog running - black silhouette (to find among rabbits) -->
+  <!-- Body stretched -->
+  <ellipse cx="50" cy="45" rx="30" ry="15" fill="black"/>
+  <!-- Head -->
+  <ellipse cx="20" cy="38" rx="14" ry="12" fill="black"/>
+  <!-- Snout -->
+  <ellipse cx="8" cy="42" rx="8" ry="6" fill="black"/>
+  <!-- Floppy ears -->
+  <path d="M15 32 Q8 28 5 35 Q4 42 10 45" fill="black"/>
+  <path d="M25 30 Q22 22 28 20 Q35 22 32 32" fill="black"/>
+  <!-- Front legs -->
+  <path d="M28 55 L18 75 L15 80" fill="none" stroke="black" stroke-width="6" stroke-linecap="round"/>
+  <path d="M38 55 L30 72 L25 78" fill="none" stroke="black" stroke-width="6" stroke-linecap="round"/>
+  <!-- Back legs -->
+  <path d="M65 52 L78 68 L85 75" fill="none" stroke="black" stroke-width="7" stroke-linecap="round"/>
+  <path d="M72 48 L88 58 L95 62" fill="none" stroke="black" stroke-width="7" stroke-linecap="round"/>
+  <!-- Tail up -->
+  <path d="M78 40 Q88 30 92 25" fill="none" stroke="black" stroke-width="5" stroke-linecap="round"/>
+</svg>

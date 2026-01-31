@@ -68,12 +68,11 @@ export interface TennisTrialConfig extends TrialConfig {
   paddle_height: number;
 }
 
-// Dynamic Tracking (Two Circles) specific
-export interface TwoCirclesTrialConfig extends TrialConfig {
-  circle1_path: { x: number; y: number; time: number }[];
-  circle2_path: { x: number; y: number; time: number }[];
-  overlap_times: number[];
-  circle_radius: number;
+// Visual Discrimination specific
+export interface VisualDiscriminationTrialConfig extends TrialConfig {
+  target_shape_id: number;
+  option_shape_ids: number[];
+  correct_option_index: number;
 }
 
 // Visual Saccades specific
@@ -117,29 +116,42 @@ export interface ExerciseProps {
   showFeedback: boolean;
 }
 
-// All exercise IDs
+// All exercise IDs (in session order)
 export type ExerciseId = 
-  | 'coherent_motion'
-  | 'visual_search'
   | 'line_tracking'
+  | 'coherent_motion'
+  | 'visual_discrimination'
   | 'maze_tracking'
+  | 'visual_memory'
   | 'dynamic_football'
   | 'dynamic_tennis'
-  | 'dynamic_circles'
   | 'visual_saccades'
-  | 'visual_memory'
+  | 'visual_search'
   | 'pair_search';
 
 export const EXERCISE_NAMES: Record<ExerciseId, string> = {
+  line_tracking: 'Static Eye Tracking - Lines',
   coherent_motion: 'Coherent Motion Detection',
-  visual_search: 'Visual Search',
-  line_tracking: 'Line Tracking',
-  maze_tracking: 'Maze Tracking',
-  dynamic_football: 'Football (Moving Circle)',
-  dynamic_tennis: 'Tennis',
-  dynamic_circles: 'Two Moving Circles',
-  visual_saccades: 'Visual Saccades',
+  visual_discrimination: 'Visual Discrimination - Pairs',
+  maze_tracking: 'Static Eye Tracking - Maze',
   visual_memory: 'Visual Memory',
-  pair_search: 'Pair Search',
+  dynamic_football: 'Dynamic Eye Tracking - Football',
+  dynamic_tennis: 'Dynamic Eye Tracking - Tennis',
+  visual_saccades: 'Saccades',
+  visual_search: 'Visual Search',
+  pair_search: 'Pair Search (Legacy)',
 };
+
+// Session exercise order (9 exercises as per instructions)
+export const SESSION_EXERCISE_ORDER: ExerciseId[] = [
+  'line_tracking',
+  'coherent_motion',
+  'visual_discrimination',
+  'maze_tracking',
+  'visual_memory',
+  'dynamic_football',
+  'dynamic_tennis',
+  'visual_saccades',
+  'visual_search',
+];
 

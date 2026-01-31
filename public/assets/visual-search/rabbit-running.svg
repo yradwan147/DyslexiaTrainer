@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Rabbit running/leaping - black silhouette -->
+  <!-- Body stretched horizontally -->
+  <ellipse cx="50" cy="50" rx="32" ry="15" fill="black"/>
+  <!-- Head -->
+  <ellipse cx="18" cy="42" rx="12" ry="10" fill="black"/>
+  <!-- Long ears pointing back -->
+  <path d="M22 38 Q30 20 35 15 Q38 12 40 15 Q42 20 38 30 L32 40" fill="black"/>
+  <path d="M28 35 Q38 18 45 12 Q48 10 50 12 Q52 18 48 28 L38 38" fill="black"/>
+  <!-- Front legs extended -->
+  <path d="M25 55 L12 70 L8 75" fill="none" stroke="black" stroke-width="6" stroke-linecap="round"/>
+  <path d="M32 58 L20 72 L15 78" fill="none" stroke="black" stroke-width="6" stroke-linecap="round"/>
+  <!-- Back legs extended back -->
+  <path d="M70 52 L85 65 L92 70" fill="none" stroke="black" stroke-width="7" stroke-linecap="round"/>
+  <path d="M75 48 L90 55 L98 58" fill="none" stroke="black" stroke-width="7" stroke-linecap="round"/>
+  <!-- Fluffy tail -->
+  <circle cx="82" cy="45" r="8" fill="black"/>
+</svg>

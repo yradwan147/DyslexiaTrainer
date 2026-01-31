@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Rabbit sitting (different pose from standing) - black silhouette -->
+  <!-- Body sitting lower -->
+  <ellipse cx="55" cy="65" rx="25" ry="20" fill="black"/>
+  <!-- Head turned slightly -->
+  <ellipse cx="35" cy="40" rx="15" ry="14" fill="black"/>
+  <!-- Ears going to the side/back -->
+  <path d="M28 35 L10 20 Q8 18 12 15 Q18 15 25 25 L32 35" fill="black"/>
+  <path d="M38 32 L25 15 Q24 12 28 10 Q34 12 40 22 L42 32" fill="black"/>
+  <!-- Front paw visible -->
+  <ellipse cx="30" cy="75" rx="8" ry="6" fill="black"/>
+  <!-- Back foot -->
+  <ellipse cx="75" cy="80" rx="10" ry="6" fill="black"/>
+</svg>
