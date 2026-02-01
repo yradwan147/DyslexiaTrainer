@@ -1,5 +1,6 @@
-// Visual Search Exercise Data - 10 configurations based on EXACT reference images
-// All items are BLACK SILHOUETTES as shown in the reference images
+// Visual Search Exercise Data - PROCEDURALLY GENERATED configurations
+// Based on the 10 reference image TYPES but with randomized positions
+// All items are BLACK SILHOUETTES
 // User must find the one different item among identical silhouettes
 
 export interface VisualSearchConfig {
@@ -10,6 +11,67 @@ export interface VisualSearchConfig {
   differentItems: { row: number; col: number; item: string }[]; // Position and type of different items
   totalDifferent: number; // How many to find
   description: string; // Description for hint
+}
+
+// Puzzle types based on reference images - defines main/different pairs
+export interface PuzzleType {
+  mainItem: string;
+  differentItem: string;
+  description: string;
+  gridSize: number;
+  gridRows?: number;
+}
+
+// All puzzle types derived from the 10 reference images
+export const PUZZLE_TYPES: PuzzleType[] = [
+  { mainItem: 'dog-sitting', differentItem: 'cat-sitting', description: 'Find the cat among dogs', gridSize: 4 },
+  { mainItem: 'mouse-sitting', differentItem: 'mouse-lying', description: 'Find the mouse with different pose', gridSize: 4 },
+  { mainItem: 'rabbit-running', differentItem: 'dog-running', description: 'Find the dog among rabbits', gridSize: 4 },
+  { mainItem: 'rabbit-standing', differentItem: 'rabbit-sitting', description: 'Find the rabbit with different pose', gridSize: 4 },
+  { mainItem: 'horse-standing', differentItem: 'dog-sitting', description: 'Find the dog among horses', gridSize: 4, gridRows: 5 },
+  { mainItem: 'apple', differentItem: 'strawberry', description: 'Find the different fruit', gridSize: 4 },
+  { mainItem: 'pear', differentItem: 'pear-no-leaf', description: 'Find the pear without a leaf', gridSize: 4 },
+  { mainItem: 'bird-small', differentItem: 'bird-tall', description: 'Find the different bird', gridSize: 4 },
+  { mainItem: 'penguin', differentItem: 'owl', description: 'Find the owl among penguins', gridSize: 4 },
+  { mainItem: 'wolf-howling', differentItem: 'dog-sitting', description: 'Find the dog among wolves', gridSize: 4 },
+  // Additional puzzle types for more variety
+  { mainItem: 'cat-sitting', differentItem: 'dog-sitting', description: 'Find the dog among cats', gridSize: 4 },
+  { mainItem: 'owl', differentItem: 'penguin', description: 'Find the penguin among owls', gridSize: 4 },
+  { mainItem: 'strawberry', differentItem: 'apple', description: 'Find the apple among strawberries', gridSize: 4 },
+  { mainItem: 'dog-running', differentItem: 'rabbit-running', description: 'Find the rabbit among dogs', gridSize: 4 },
+  { mainItem: 'bird-tall', differentItem: 'bird-small', description: 'Find the small bird', gridSize: 4 },
+];
+
+// Seeded random number generator for reproducibility
+function seededRandom(seed: number): () => number {
+  return function() {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+}
+
+// Generate a unique puzzle configuration with random position
+export function generateVisualSearchConfig(taskIndex: number, sessionSeed: number = Date.now()): VisualSearchConfig {
+  const rng = seededRandom(sessionSeed + taskIndex * 1000);
+  
+  // Pick a puzzle type (cycling through all types)
+  const puzzleType = PUZZLE_TYPES[taskIndex % PUZZLE_TYPES.length];
+  const { gridSize, gridRows, mainItem, differentItem, description } = puzzleType;
+  const actualRows = gridRows || gridSize;
+  
+  // Generate random position for the different item
+  const row = Math.floor(rng() * actualRows);
+  const col = Math.floor(rng() * gridSize);
+  
+  return {
+    id: taskIndex + 1,
+    gridSize,
+    gridRows,
+    mainItem,
+    differentItems: [{ row, col, item: differentItem }],
+    totalDifferent: 1,
+    description,
+  };
 }
 
 // SVG asset paths for silhouettes

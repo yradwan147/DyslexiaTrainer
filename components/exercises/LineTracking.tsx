@@ -2,7 +2,13 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import type { ExerciseProps, LineTrackingTrialConfig } from '@/lib/exercises/types';
-import { LINE_TRACKING_CONFIGS, type LineTrackingConfig, type LineItem } from '@/lib/exercises/lineTrackingData';
+import { LINE_TRACKING_CONFIGS, getLineTrackingConfig, type LineTrackingConfig, type LineItem } from '@/lib/exercises/lineTrackingData';
+
+// Generate a session seed for reproducible but unique puzzles
+function getSessionSeed(): number {
+  const today = new Date();
+  return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+}
 
 // Generate curved path between two points with random-ish control points
 function generateCurvedPath(
@@ -102,14 +108,14 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
   const [wrongAttempts, setWrongAttempts] = useState(0);
   const [showFeedback, setShowFeedback] = useState<{ index: number; correct: boolean } | null>(null);
   const [currentConfigNum, setCurrentConfigNum] = useState(0);
+  const [sessionSeed] = useState(() => getSessionSeed() + currentTrialIndex * 100);
   const startTimeRef = useRef<number>(Date.now());
   const svgRef = useRef<SVGSVGElement>(null);
 
   const trial = config.trials[currentTrialIndex] as LineTrackingTrialConfig;
   
-  // Get the line tracking configuration - each set uses a DIFFERENT configuration
-  const configIndex = currentConfigNum % LINE_TRACKING_CONFIGS.length;
-  const lineConfig = LINE_TRACKING_CONFIGS[configIndex];
+  // Get the line tracking configuration - uses procedural generation for variety
+  const lineConfig = getLineTrackingConfig(currentConfigNum, sessionSeed);
   
   const itemCount = lineConfig.leftItems.length;
   const allSolved = solvedLines.size === itemCount;

@@ -425,3 +425,154 @@ export function getConfigForSession(sessionNumber: number): LineTrackingConfig {
   const index = Math.max(0, Math.min(sessionNumber - 1, LINE_TRACKING_CONFIGS.length - 1));
   return LINE_TRACKING_CONFIGS[index];
 }
+
+// ============================================
+// PROCEDURAL GENERATION
+// ============================================
+
+// Color palette for procedural generation
+const COLORS = [
+  '#1e40af', // Blue
+  '#dc2626', // Red
+  '#16a34a', // Green
+  '#9333ea', // Purple
+  '#ea580c', // Orange
+  '#0891b2', // Cyan
+  '#be185d', // Pink
+  '#854d0e', // Brown
+];
+
+// Font styles for procedural generation
+const FONT_STYLES: LineItem['fontStyle'][] = ['normal', 'italic', 'cursive', 'serif', 'gothic', 'handwritten'];
+
+// Line styles for procedural generation
+const LINE_STYLES: LineStyle['type'][] = ['curved', 'angular', 'wavy'];
+
+// Image pairs for procedural generation
+const IMAGE_PAIRS = [
+  { left: '/assets/line-tracking/cow.svg', right: '/assets/line-tracking/milk.svg' },
+  { left: '/assets/line-tracking/lion.svg', right: '/assets/line-tracking/zebra.svg' },
+  { left: '/assets/line-tracking/bunny.svg', right: '/assets/line-tracking/basket.svg' },
+  { left: '/assets/line-tracking/hen.svg', right: '/assets/line-tracking/chick.svg' },
+];
+
+// Seeded random number generator
+function seededRandom(seed: number): () => number {
+  return function() {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+}
+
+// Shuffle array using seeded RNG
+function shuffleArray<T>(array: T[], rng: () => number): T[] {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+// Generate a procedural letter-number matching config
+export function generateLineTrackingConfig(taskIndex: number, sessionSeed: number = Date.now()): LineTrackingConfig {
+  const rng = seededRandom(sessionSeed + taskIndex * 1000);
+  
+  // Determine type: image-based (first 4) or letter-based (rest)
+  const useImages = taskIndex < 4 && rng() > 0.3;
+  
+  if (useImages) {
+    // Image-based puzzle
+    const pairIndex = taskIndex % IMAGE_PAIRS.length;
+    const pair = IMAGE_PAIRS[pairIndex];
+    const itemCount = 4 + Math.floor(rng() * 2); // 4-5 items
+    
+    const leftItems: LineItem[] = Array(itemCount).fill(null).map(() => ({ 
+      type: 'image' as const, 
+      value: pair.left 
+    }));
+    const rightItems: LineItem[] = Array(itemCount).fill(null).map(() => ({ 
+      type: 'image' as const, 
+      value: pair.right 
+    }));
+    
+    // Generate random connections (shuffle indices)
+    const connections = shuffleArray([...Array(itemCount).keys()], rng);
+    
+    // Random line style and color
+    const lineStyle: LineStyle = {
+      type: LINE_STYLES[Math.floor(rng() * LINE_STYLES.length)],
+      dashed: rng() > 0.7,
+      strokeWidth: 2 + Math.floor(rng() * 2),
+    };
+    const lineColor = COLORS[Math.floor(rng() * COLORS.length)];
+    
+    return {
+      id: 100 + taskIndex,
+      level: 2,
+      exercise: taskIndex + 1,
+      title: 'Kdo je kaj izgubil?',
+      leftItems,
+      rightItems,
+      connections,
+      lineStyle,
+      lineColor,
+    };
+  } else {
+    // Letter-number matching puzzle
+    const itemCount = 4 + Math.floor(rng() * 3); // 4-6 items
+    const uppercase = rng() > 0.5;
+    const letters = uppercase 
+      ? ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+      : ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    const numbers = ['1', '2', '3', '4', '5', '6', '7', '8'];
+    
+    const color = COLORS[Math.floor(rng() * COLORS.length)];
+    const fontStyle = FONT_STYLES[Math.floor(rng() * FONT_STYLES.length)];
+    
+    const leftItems: LineItem[] = letters.slice(0, itemCount).map(value => ({
+      type: 'text' as const,
+      value,
+      color,
+      fontStyle,
+    }));
+    const rightItems: LineItem[] = numbers.slice(0, itemCount).map(value => ({
+      type: 'text' as const,
+      value,
+      color,
+      fontStyle,
+    }));
+    
+    // Generate random connections
+    const connections = shuffleArray([...Array(itemCount).keys()], rng);
+    
+    // Random line style
+    const lineStyle: LineStyle = {
+      type: LINE_STYLES[Math.floor(rng() * LINE_STYLES.length)],
+      dashed: rng() > 0.8,
+      strokeWidth: 2 + Math.floor(rng() * 2),
+    };
+    const lineColor = COLORS[Math.floor(rng() * COLORS.length)];
+    
+    return {
+      id: 100 + taskIndex,
+      level: 3 + Math.floor(rng() * 3),
+      exercise: taskIndex + 1,
+      title: 'Kdo je kaj izgubil?',
+      leftItems,
+      rightItems,
+      connections,
+      lineStyle,
+      lineColor,
+    };
+  }
+}
+
+// Get config: use static for first few, then procedural
+export function getLineTrackingConfig(taskIndex: number, sessionSeed: number): LineTrackingConfig {
+  // First 10 tasks use static configs (reference images), rest are procedural
+  if (taskIndex < LINE_TRACKING_CONFIGS.length) {
+    return LINE_TRACKING_CONFIGS[taskIndex];
+  }
+  return generateLineTrackingConfig(taskIndex, sessionSeed);
+}

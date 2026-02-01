@@ -3,11 +3,18 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import type { ExerciseProps } from '@/lib/exercises/types';
 import { 
-  MEMORY_SEQUENCES, 
+  MEMORY_SEQUENCES,
+  getMemorySequenceConfig,
   getItemEmoji, 
   getAllUniqueItems,
   type MemorySequence 
 } from '@/lib/exercises/visualMemoryData';
+
+// Generate a session seed for reproducible but unique puzzles
+function getSessionSeed(): number {
+  const today = new Date();
+  return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+}
 
 type Phase = 'showing' | 'input' | 'feedback' | 'complete';
 
@@ -23,12 +30,11 @@ export function VisualMemory({ config, currentTrialIndex, onTrialComplete }: Exe
   const [showCorrect, setShowCorrect] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(DISPLAY_TIME_MS / 1000);
   const [availableItems, setAvailableItems] = useState<string[]>([]);
+  const [sessionSeed] = useState(() => getSessionSeed() + currentTrialIndex * 100);
   const startTimeRef = useRef<number>(Date.now());
 
-  // Get sequence - each item uses a DIFFERENT sequence
-  // Progress through all sequences, cycling if needed
-  const sequenceIndex = currentItem % MEMORY_SEQUENCES.length;
-  const currentSequence = MEMORY_SEQUENCES[sequenceIndex];
+  // Get sequence - uses procedural generation for variety
+  const currentSequence = getMemorySequenceConfig(currentItem, sessionSeed);
 
   // Reset on trial/item change
   useEffect(() => {

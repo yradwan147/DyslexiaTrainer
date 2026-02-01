@@ -3,12 +3,19 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import type { ExerciseProps } from '@/lib/exercises/types';
 import { 
-  MAZE_CONFIGS, 
+  MAZE_CONFIGS,
+  getMazeTrackingConfig,
   type MazeConfig, 
   type WallSegment,
   getCharacterEmoji,
   getCollectibleEmoji 
 } from '@/lib/exercises/mazeTrackingData';
+
+// Generate a session seed for reproducible but unique puzzles
+function getSessionSeed(): number {
+  const today = new Date();
+  return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+}
 
 const MAZES_PER_SESSION = 5;
 
@@ -19,12 +26,11 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
   const [showWrongFeedback, setShowWrongFeedback] = useState<{ row: number; col: number } | null>(null);
   const [isComplete, setIsComplete] = useState(false);
   const [currentMaze, setCurrentMaze] = useState(0);
+  const [sessionSeed] = useState(() => getSessionSeed() + currentTrialIndex * 100);
   const startTimeRef = useRef<number>(Date.now());
 
-  // Get maze configuration - each maze uses a DIFFERENT configuration
-  // Progress through all 15 mazes, cycling if needed
-  const configIndex = currentMaze % MAZE_CONFIGS.length;
-  const mazeConfig = MAZE_CONFIGS[configIndex];
+  // Get maze configuration - uses procedural generation for variety
+  const mazeConfig = getMazeTrackingConfig(currentMaze, sessionSeed);
 
   const { gridSize, walls, collectibles, characterType, characterPosition, collectibleType } = mazeConfig;
   

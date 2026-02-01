@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import type { ExerciseProps } from '@/lib/exercises/types';
 import { 
-  VISUAL_SEARCH_CONFIGS, 
+  generateVisualSearchConfig,
   getSilhouetteAsset,
   getSilhouetteEmoji,
   type VisualSearchConfig 
@@ -12,6 +12,13 @@ import {
 
 const TASKS_PER_SESSION = 10;
 const MAX_ATTEMPTS = 20;
+
+// Generate a session seed for reproducible but unique puzzles
+function getSessionSeed(): number {
+  // Use current date as base seed so puzzles change daily
+  const today = new Date();
+  return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+}
 
 // Silhouette display component
 function Silhouette({ name, size }: { name: string; size: number }) {
@@ -43,12 +50,12 @@ export function VisualSearch({ config, currentTrialIndex, onTrialComplete }: Exe
   const [currentTask, setCurrentTask] = useState(0);
   const [totalAttempts, setTotalAttempts] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [sessionSeed] = useState(() => getSessionSeed() + currentTrialIndex * 100);
   const startTimeRef = useRef<number>(Date.now());
 
-  // Get configuration - each task uses a DIFFERENT configuration
-  // Progress through all 10 reference images (configs 1-10), cycling if needed
-  const configIndex = currentTask % Math.min(TASKS_PER_SESSION, VISUAL_SEARCH_CONFIGS.length);
-  const searchConfig = VISUAL_SEARCH_CONFIGS[configIndex];
+  // Generate unique configuration for each task
+  // Uses procedural generation with session seed for variety
+  const searchConfig = generateVisualSearchConfig(currentTask, sessionSeed);
 
   const { gridSize, gridRows, mainItem, differentItems, totalDifferent, description } = searchConfig;
   const actualRows = gridRows || gridSize;

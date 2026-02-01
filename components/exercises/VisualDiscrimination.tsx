@@ -3,10 +3,17 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import type { ExerciseProps } from '@/lib/exercises/types';
 import { 
-  VISUAL_DISCRIMINATION_PAIRS_CONFIGS, 
+  VISUAL_DISCRIMINATION_PAIRS_CONFIGS,
+  getDiscriminationConfig,
   type CompositeShape,
   type ShapeElement 
 } from '@/lib/exercises/visualDiscriminationPairsData';
+
+// Generate a session seed for reproducible but unique puzzles
+function getSessionSeed(): number {
+  const today = new Date();
+  return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+}
 
 interface OptionState {
   eliminated: boolean;
@@ -241,10 +248,10 @@ export function VisualDiscrimination({ config, currentTrialIndex, onTrialComplet
 
   // Items per session - progress through different configurations
   const ITEMS_PER_SESSION = 4;
+  const [sessionSeed] = useState(() => getSessionSeed() + currentTrialIndex * 100);
   
-  // Get configuration - each item uses a DIFFERENT configuration
-  const configIndex = currentItem % VISUAL_DISCRIMINATION_PAIRS_CONFIGS.length;
-  const discConfig = VISUAL_DISCRIMINATION_PAIRS_CONFIGS[configIndex];
+  // Get configuration - uses procedural generation for variety
+  const discConfig = getDiscriminationConfig(currentItem, sessionSeed);
 
   // Reset on trial change
   useEffect(() => {

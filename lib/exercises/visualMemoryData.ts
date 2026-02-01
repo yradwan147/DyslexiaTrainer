@@ -278,3 +278,105 @@ export function getSequencesByItemCount(count: number): MemorySequence[] {
 export function getSequenceById(id: number): MemorySequence | undefined {
   return MEMORY_SEQUENCES.find(s => s.id === id);
 }
+
+// ============================================
+// PROCEDURAL GENERATION
+// ============================================
+
+// Seeded random number generator
+function seededRandom(seed: number): () => number {
+  return function() {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+}
+
+// Shuffle array using seeded RNG
+function shuffleArraySeeded<T>(array: T[], rng: () => number): T[] {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+// Item categories for generating diverse sequences
+const ITEM_CATEGORIES: Record<string, string[]> = {
+  animals: ['cat', 'dog', 'fish', 'crab', 'snail', 'lion', 'giraffe', 'turtle', 'frog', 'lizard', 'tiger', 'caterpillar', 'butterfly'],
+  fruits: ['apple', 'greenapple', 'pear', 'orange', 'strawberry', 'cherry', 'watermelon', 'banana', 'lemon', 'pineapple', 'grapes', 'kiwi'],
+  vegetables: ['carrot', 'cucumber', 'broccoli', 'lettuce', 'corn'],
+  vehicles: ['car', 'bicycle', 'scooter', 'airplane', 'ship', 'bus', 'train'],
+  nature: ['tree', 'sun', 'moon', 'flower', 'cactus', 'leaf', 'palm', 'grass', 'bush', 'rainbow', 'cloud'],
+  objects: ['chair', 'house', 'ball', 'balloon', 'pencil', 'ring', 'racket', 'umbrella', 'frisbee', 'candy', 'cheese', 'cup', 'sneakers', 'tennisball'],
+};
+
+// All items for procedural selection
+const ALL_ITEMS = Object.values(ITEM_CATEGORIES).flat();
+
+// Generate a procedural memory sequence
+export function generateMemorySequence(taskIndex: number, sessionSeed: number = Date.now()): MemorySequence {
+  const rng = seededRandom(sessionSeed + taskIndex * 1000);
+  
+  // Determine sequence length (3-7 items)
+  const itemCount = 3 + Math.floor(rng() * 5);
+  
+  // Determine difficulty level based on selection strategy
+  const level = 1 + Math.floor(rng() * 3);
+  
+  let sequence: string[];
+  
+  if (level === 1) {
+    // Level 1: Visually different - pick from DIFFERENT categories
+    const shuffledCategories = shuffleArraySeeded(Object.keys(ITEM_CATEGORIES), rng);
+    sequence = [];
+    for (let i = 0; i < itemCount; i++) {
+      const category = shuffledCategories[i % shuffledCategories.length];
+      const items = ITEM_CATEGORIES[category];
+      sequence.push(items[Math.floor(rng() * items.length)]);
+    }
+  } else if (level === 2) {
+    // Level 2: Mix - some from same category, some from different
+    const primaryCategory = Object.keys(ITEM_CATEGORIES)[Math.floor(rng() * Object.keys(ITEM_CATEGORIES).length)];
+    const primaryItems = shuffleArraySeeded(ITEM_CATEGORIES[primaryCategory], rng);
+    const otherItems = shuffleArraySeeded(ALL_ITEMS.filter(i => !ITEM_CATEGORIES[primaryCategory].includes(i)), rng);
+    
+    sequence = [];
+    for (let i = 0; i < itemCount; i++) {
+      if (i < itemCount / 2) {
+        sequence.push(primaryItems[i % primaryItems.length]);
+      } else {
+        sequence.push(otherItems[i % otherItems.length]);
+      }
+    }
+    sequence = shuffleArraySeeded(sequence, rng);
+  } else {
+    // Level 3: Visually similar - pick from SAME category
+    const category = Object.keys(ITEM_CATEGORIES)[Math.floor(rng() * Object.keys(ITEM_CATEGORIES).length)];
+    const items = shuffleArraySeeded(ITEM_CATEGORIES[category], rng);
+    sequence = items.slice(0, Math.min(itemCount, items.length));
+    
+    // If not enough items in category, add from all
+    while (sequence.length < itemCount) {
+      const additional = ALL_ITEMS[Math.floor(rng() * ALL_ITEMS.length)];
+      if (!sequence.includes(additional)) {
+        sequence.push(additional);
+      }
+    }
+  }
+  
+  return {
+    id: 100 + taskIndex,
+    level,
+    itemCount,
+    sequence,
+  };
+}
+
+// Get sequence: first 75 are static, then procedural
+export function getMemorySequenceConfig(taskIndex: number, sessionSeed: number): MemorySequence {
+  if (taskIndex < MEMORY_SEQUENCES.length) {
+    return MEMORY_SEQUENCES[taskIndex];
+  }
+  return generateMemorySequence(taskIndex, sessionSeed);
+}

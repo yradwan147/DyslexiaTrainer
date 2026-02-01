@@ -520,3 +520,101 @@ export function getMazeConfig(level: number): MazeConfig {
   const index = Math.max(0, Math.min(level - 1, MAZE_CONFIGS.length - 1));
   return MAZE_CONFIGS[index];
 }
+
+// ============================================
+// PROCEDURAL GENERATION
+// ============================================
+
+// Seeded random number generator
+function seededRandom(seed: number): () => number {
+  return function() {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+}
+
+// Character and collectible type options
+const CHARACTER_TYPES: MazeConfig['characterType'][] = ['pirate', 'robot', 'wizard', 'bird'];
+const CHARACTER_POSITIONS: MazeConfig['characterPosition'][] = ['top-left', 'left', 'bottom-right'];
+const COLLECTIBLE_TYPES: MazeConfig['collectibleType'][] = ['treasure', 'treasure-blue', 'coin', 'sheep', 'key'];
+
+// Generate random walls for a maze
+function generateRandomWalls(gridSize: number, rng: () => number): WallSegment[] {
+  const walls: WallSegment[] = [];
+  
+  // Border walls
+  walls.push(h(0, 0, gridSize));
+  walls.push(v(0, 0, gridSize));
+  walls.push(h(gridSize, 0, gridSize));
+  walls.push(v(0, gridSize, gridSize));
+  
+  // Add internal walls - random pattern
+  const numWalls = 6 + Math.floor(rng() * 8);
+  
+  for (let i = 0; i < numWalls; i++) {
+    const isHorizontal = rng() > 0.5;
+    const row = 1 + Math.floor(rng() * (gridSize - 2));
+    const col = Math.floor(rng() * (gridSize - 2));
+    const length = 1 + Math.floor(rng() * 3);
+    
+    if (isHorizontal) {
+      walls.push(h(row, col, Math.min(length, gridSize - col)));
+    } else {
+      walls.push(v(row, col, Math.min(length, gridSize - row)));
+    }
+  }
+  
+  return walls;
+}
+
+// Generate collectible positions
+function generateCollectibles(gridSize: number, count: number, rng: () => number): CollectiblePosition[] {
+  const collectibles: CollectiblePosition[] = [];
+  const usedPositions = new Set<string>();
+  
+  for (let order = 1; order <= count; order++) {
+    let attempts = 0;
+    let row: number, col: number;
+    
+    do {
+      row = Math.floor(rng() * gridSize);
+      col = Math.floor(rng() * gridSize);
+      attempts++;
+    } while (usedPositions.has(`${row}-${col}`) && attempts < 50);
+    
+    usedPositions.add(`${row}-${col}`);
+    collectibles.push({ row, col, order });
+  }
+  
+  return collectibles;
+}
+
+// Generate a procedural maze configuration
+export function generateMazeConfig(taskIndex: number, sessionSeed: number = Date.now()): MazeConfig {
+  const rng = seededRandom(sessionSeed + taskIndex * 1000);
+  
+  const gridSize = 8 + Math.floor(rng() * 2) * 2; // 8 or 10
+  const characterType = CHARACTER_TYPES[Math.floor(rng() * CHARACTER_TYPES.length)];
+  const characterPosition = CHARACTER_POSITIONS[Math.floor(rng() * CHARACTER_POSITIONS.length)];
+  const collectibleType = COLLECTIBLE_TYPES[Math.floor(rng() * COLLECTIBLE_TYPES.length)];
+  const collectibleCount = 4 + Math.floor(rng() * 5); // 4-8 collectibles
+  
+  return {
+    id: 100 + taskIndex,
+    gridSize,
+    characterType,
+    characterPosition,
+    collectibleType,
+    collectibleCount,
+    walls: generateRandomWalls(gridSize, rng),
+    collectibles: generateCollectibles(gridSize, collectibleCount, rng),
+  };
+}
+
+// Get maze config: first 15 are static, then procedural
+export function getMazeTrackingConfig(taskIndex: number, sessionSeed: number): MazeConfig {
+  if (taskIndex < MAZE_CONFIGS.length) {
+    return MAZE_CONFIGS[taskIndex];
+  }
+  return generateMazeConfig(taskIndex, sessionSeed);
+}

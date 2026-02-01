@@ -462,3 +462,127 @@ export function getVisualDiscriminationPairsConfig(level: number): VisualDiscrim
   const index = Math.max(0, Math.min(level - 1, VISUAL_DISCRIMINATION_PAIRS_CONFIGS.length - 1));
   return VISUAL_DISCRIMINATION_PAIRS_CONFIGS[index];
 }
+
+// ============================================
+// PROCEDURAL GENERATION
+// ============================================
+
+// Seeded random number generator
+function seededRandom(seed: number): () => number {
+  return function() {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+}
+
+// Shape type configurations for procedural generation
+interface ShapeTemplate {
+  baseShapes: ShapeElement[];
+  variations: ((shapes: ShapeElement[], rng: () => number) => ShapeElement[])[];
+}
+
+// Create subtle variations of shapes
+function variatePosition(shapes: ShapeElement[], rng: () => number): ShapeElement[] {
+  const targetIdx = Math.floor(rng() * shapes.length);
+  return shapes.map((s, i) => i === targetIdx ? { ...s, x: s.x + (rng() - 0.5) * 20, y: s.y + (rng() - 0.5) * 20 } : s);
+}
+
+function variateSize(shapes: ShapeElement[], rng: () => number): ShapeElement[] {
+  const targetIdx = Math.floor(rng() * shapes.length);
+  const factor = rng() > 0.5 ? 1.2 : 0.8;
+  return shapes.map((s, i) => i === targetIdx ? { ...s, size: s.size * factor } : s);
+}
+
+function variateRotation(shapes: ShapeElement[], rng: () => number): ShapeElement[] {
+  const targetIdx = Math.floor(rng() * shapes.length);
+  return shapes.map((s, i) => i === targetIdx ? { ...s, rotation: s.rotation + (rng() - 0.5) * 60 } : s);
+}
+
+function removeShape(shapes: ShapeElement[], rng: () => number): ShapeElement[] {
+  if (shapes.length <= 1) return variatePosition(shapes, rng);
+  const targetIdx = Math.floor(rng() * shapes.length);
+  return shapes.filter((_, i) => i !== targetIdx);
+}
+
+// Base shape templates for generation
+const SHAPE_TEMPLATES: (() => ShapeElement[])[] = [
+  // Circle with rectangle
+  () => [circle(50, 50, 70), rectangle(50, 50, 50, 20)],
+  // Circle with triangle
+  () => [circle(50, 50, 70), triangle(50, 35, 40, 0)],
+  // Two circles
+  () => [circle(35, 50, 50), circle(65, 50, 50)],
+  // Triangle with circle
+  () => [triangle(50, 60, 70, 180), circle(50, 40, 30)],
+  // Rectangle with circles at ends
+  () => [rectangle(50, 50, 70, 15), circle(25, 50, 20), circle(75, 50, 20)],
+  // Diamond with circle
+  () => [diamond(50, 50, 50), circle(50, 50, 25)],
+  // Pentagon with triangle
+  () => [pentagon(50, 50, 60), triangle(50, 50, 25, 0)],
+  // Circle with arrows
+  () => [circle(50, 50, 70), arrow(30, 50, 20, 180), arrow(70, 50, 20, 0)],
+  // Overlapping triangles
+  () => [triangle(50, 40, 50, 0), triangle(50, 60, 50, 180)],
+  // Circle with diamond
+  () => [circle(50, 50, 75), diamond(50, 50, 35)],
+];
+
+const VARIATION_FUNCTIONS = [variatePosition, variateSize, variateRotation, removeShape];
+
+// Generate a procedural visual discrimination puzzle
+export function generateVisualDiscriminationConfig(taskIndex: number, sessionSeed: number = Date.now()): VisualDiscriminationPairsConfig {
+  const rng = seededRandom(sessionSeed + taskIndex * 1000);
+  
+  // Pick a template
+  const templateIdx = taskIndex % SHAPE_TEMPLATES.length;
+  const baseShapes = SHAPE_TEMPLATES[templateIdx]();
+  
+  // Create the correct answer (the original)
+  const correct: CompositeShape = { elements: [...baseShapes] };
+  
+  // Create 3 wrong options with variations
+  const wrongOptions: CompositeShape[] = [];
+  const usedVariations: number[] = [];
+  
+  for (let i = 0; i < 3; i++) {
+    let variationIdx = Math.floor(rng() * VARIATION_FUNCTIONS.length);
+    // Try to use different variations
+    while (usedVariations.includes(variationIdx) && usedVariations.length < VARIATION_FUNCTIONS.length) {
+      variationIdx = (variationIdx + 1) % VARIATION_FUNCTIONS.length;
+    }
+    usedVariations.push(variationIdx);
+    
+    const variedElements = VARIATION_FUNCTIONS[variationIdx]([...baseShapes], rng);
+    wrongOptions.push({ elements: variedElements });
+  }
+  
+  // Insert correct answer at random position
+  const correctIndex = Math.floor(rng() * 4);
+  const options: CompositeShape[] = [];
+  let wrongIdx = 0;
+  
+  for (let i = 0; i < 4; i++) {
+    if (i === correctIndex) {
+      options.push(correct);
+    } else {
+      options.push(wrongOptions[wrongIdx++]);
+    }
+  }
+  
+  return {
+    id: 100 + taskIndex,
+    description: `Procedural puzzle ${taskIndex + 1}`,
+    target: correct,
+    options,
+    correctIndex,
+  };
+}
+
+// Get config: first 15 are static (reference), then procedural
+export function getDiscriminationConfig(taskIndex: number, sessionSeed: number): VisualDiscriminationPairsConfig {
+  if (taskIndex < VISUAL_DISCRIMINATION_PAIRS_CONFIGS.length) {
+    return VISUAL_DISCRIMINATION_PAIRS_CONFIGS[taskIndex];
+  }
+  return generateVisualDiscriminationConfig(taskIndex, sessionSeed);
+}
