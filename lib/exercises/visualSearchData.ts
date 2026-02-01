@@ -51,13 +51,17 @@ function seededRandom(seed: number): () => number {
 }
 
 // Generate a unique puzzle configuration with random position
-export function generateVisualSearchConfig(taskIndex: number, sessionSeed: number = Date.now()): VisualSearchConfig {
+// Difficulty affects grid size: 1=4x4, 2=5x5, 3=6x6, 4=7x7, 5=8x8
+export function generateVisualSearchConfig(taskIndex: number, sessionSeed: number = Date.now(), difficulty: number = 1): VisualSearchConfig {
   const rng = seededRandom(sessionSeed + taskIndex * 1000);
   
   // Pick a puzzle type (cycling through all types)
   const puzzleType = PUZZLE_TYPES[taskIndex % PUZZLE_TYPES.length];
-  const { gridSize, gridRows, mainItem, differentItem, description } = puzzleType;
-  const actualRows = gridRows || gridSize;
+  const { mainItem, differentItem, description } = puzzleType;
+  
+  // Grid size increases with difficulty
+  const gridSize = 3 + difficulty; // 4, 5, 6, 7, 8
+  const actualRows = gridSize;
   
   // Generate random position for the different item
   const row = Math.floor(rng() * actualRows);
@@ -66,7 +70,7 @@ export function generateVisualSearchConfig(taskIndex: number, sessionSeed: numbe
   return {
     id: taskIndex + 1,
     gridSize,
-    gridRows,
+    gridRows: actualRows,
     mainItem,
     differentItems: [{ row, col, item: differentItem }],
     totalDifferent: 1,

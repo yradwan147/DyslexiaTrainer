@@ -590,14 +590,22 @@ function generateCollectibles(gridSize: number, count: number, rng: () => number
 }
 
 // Generate a procedural maze configuration
-export function generateMazeConfig(taskIndex: number, sessionSeed: number = Date.now()): MazeConfig {
+// Difficulty affects grid size and collectible count
+// Level 1: 6x6, 3-4 collectibles | Level 5: 12x12, 8-10 collectibles
+export function generateMazeConfig(taskIndex: number, sessionSeed: number = Date.now(), difficulty: number = 1): MazeConfig {
   const rng = seededRandom(sessionSeed + taskIndex * 1000);
   
-  const gridSize = 8 + Math.floor(rng() * 2) * 2; // 8 or 10
+  // Grid size increases with difficulty: 6, 7, 8, 10, 12
+  const gridSizes = [6, 7, 8, 10, 12];
+  const gridSize = gridSizes[Math.min(difficulty - 1, 4)];
+  
+  // Collectible count increases with difficulty
+  const baseCollectibles = 2 + difficulty; // 3, 4, 5, 6, 7
+  const collectibleCount = baseCollectibles + Math.floor(rng() * 2); // +0-1 random
+  
   const characterType = CHARACTER_TYPES[Math.floor(rng() * CHARACTER_TYPES.length)];
   const characterPosition = CHARACTER_POSITIONS[Math.floor(rng() * CHARACTER_POSITIONS.length)];
   const collectibleType = COLLECTIBLE_TYPES[Math.floor(rng() * COLLECTIBLE_TYPES.length)];
-  const collectibleCount = 4 + Math.floor(rng() * 5); // 4-8 collectibles
   
   return {
     id: 100 + taskIndex,

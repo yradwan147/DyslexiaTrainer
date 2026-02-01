@@ -1,24 +1,18 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import type { ExerciseProps } from '@/lib/exercises/types';
 import { 
   generateVisualSearchConfig,
   getSilhouetteAsset,
   getSilhouetteEmoji,
+  PUZZLE_TYPES,
   type VisualSearchConfig 
 } from '@/lib/exercises/visualSearchData';
 
-const TASKS_PER_SESSION = 10;
-const MAX_ATTEMPTS = 20;
-
-// Generate a session seed for reproducible but unique puzzles
-function getSessionSeed(): number {
-  // Use current date as base seed so puzzles change daily
-  const today = new Date();
-  return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-}
+// 10 unique puzzles per session, no repeats
+const PUZZLES_PER_SESSION = 10;
 
 // Silhouette display component
 function Silhouette({ name, size }: { name: string; size: number }) {
@@ -45,34 +39,47 @@ function Silhouette({ name, size }: { name: string; size: number }) {
 }
 
 export function VisualSearch({ config, currentTrialIndex, onTrialComplete }: ExerciseProps) {
+  // Get difficulty from config (1-5)
+  const difficulty = config.difficulty_level || 1;
+  
+  // Generate a unique session seed when component mounts (random, not date-based)
+  const sessionSeed = useMemo(() => Date.now() + Math.random() * 1000000, []);
+  
+  // Pre-generate all puzzles for this session - difficulty affects grid size
+  const sessionPuzzles = useMemo(() => {
+    const puzzles: VisualSearchConfig[] = [];
+    
+    for (let i = 0; i < PUZZLES_PER_SESSION; i++) {
+      // Each puzzle uses a different type with randomized position
+      puzzles.push(generateVisualSearchConfig(i, sessionSeed + i * 12345, difficulty));
+    }
+    
+    return puzzles;
+  }, [sessionSeed, difficulty]);
+
+  const [currentPuzzle, setCurrentPuzzle] = useState(0);
   const [foundItems, setFoundItems] = useState<Set<string>>(new Set());
   const [wrongClicks, setWrongClicks] = useState<Set<string>>(new Set());
-  const [currentTask, setCurrentTask] = useState(0);
-  const [totalAttempts, setTotalAttempts] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [sessionSeed] = useState(() => getSessionSeed() + currentTrialIndex * 100);
   const startTimeRef = useRef<number>(Date.now());
 
-  // Generate unique configuration for each task
-  // Uses procedural generation with session seed for variety
-  const searchConfig = generateVisualSearchConfig(currentTask, sessionSeed);
-
-  const { gridSize, gridRows, mainItem, differentItems, totalDifferent, description } = searchConfig;
+  // Get current puzzle configuration
+  const puzzleConfig = sessionPuzzles[currentPuzzle];
+  const { gridSize, gridRows, mainItem, differentItems, totalDifferent, description } = puzzleConfig;
   const actualRows = gridRows || gridSize;
 
-  // Reset on trial/task change
+  // Reset state when moving to a new puzzle
   useEffect(() => {
     setFoundItems(new Set());
     setWrongClicks(new Set());
     setShowSuccess(false);
-  }, [currentTask]);
+  }, [currentPuzzle]);
 
-  // Reset everything on new trial
+  // Reset everything when exercise restarts
   useEffect(() => {
+    setCurrentPuzzle(0);
     setFoundItems(new Set());
     setWrongClicks(new Set());
-    setCurrentTask(0);
-    setTotalAttempts(0);
     setShowSuccess(false);
     startTimeRef.current = Date.now();
   }, [currentTrialIndex]);
@@ -89,42 +96,17 @@ export function VisualSearch({ config, currentTrialIndex, onTrialComplete }: Exe
     const key = `${row}-${col}`;
     if (foundItems.has(key) || wrongClicks.has(key)) return;
 
-    setTotalAttempts(prev => prev + 1);
-
-    // Special case: if no different items (level 10), any click completes
+    // Special case: if no different items, any click advances
     if (totalDifferent === 0) {
       setShowSuccess(true);
-      setTimeout(() => {
-        const nextTask = currentTask + 1;
-        if (nextTask >= TASKS_PER_SESSION) {
-          onTrialComplete({
-            trial_index: currentTrialIndex,
-            user_response: JSON.stringify({ 
-              tasksCompleted: nextTask,
-              totalAttempts: totalAttempts + 1,
-              configId: searchConfig.id 
-            }),
-            response_time_ms: Date.now() - startTimeRef.current,
-            is_correct: true,
-            is_timed_out: false,
-            is_skipped: false,
-            started_at: new Date(startTimeRef.current).toISOString(),
-            responded_at: new Date().toISOString(),
-          });
-        } else {
-          setCurrentTask(nextTask);
-          setFoundItems(new Set());
-          setWrongClicks(new Set());
-          setShowSuccess(false);
-        }
-      }, 1000);
+      setTimeout(() => advanceToNext(), 1000);
       return;
     }
 
     const different = getDifferentItem(row, col);
     
     if (different) {
-      // Found a different item!
+      // Found the different item!
       const newFound = new Set(foundItems);
       newFound.add(key);
       setFoundItems(newFound);
@@ -132,60 +114,40 @@ export function VisualSearch({ config, currentTrialIndex, onTrialComplete }: Exe
       // Check if all found
       if (newFound.size === totalDifferent) {
         setShowSuccess(true);
-        
-        setTimeout(() => {
-          const nextTask = currentTask + 1;
-          
-          if (nextTask >= TASKS_PER_SESSION || totalAttempts >= MAX_ATTEMPTS) {
-            // Session complete
-            onTrialComplete({
-              trial_index: currentTrialIndex,
-              user_response: JSON.stringify({ 
-                tasksCompleted: nextTask,
-                totalAttempts: totalAttempts + 1,
-                level 
-              }),
-              response_time_ms: Date.now() - startTimeRef.current,
-              is_correct: true,
-              is_timed_out: false,
-              is_skipped: false,
-              started_at: new Date(startTimeRef.current).toISOString(),
-              responded_at: new Date().toISOString(),
-            });
-          } else {
-            // Next task
-            setCurrentTask(nextTask);
-            setFoundItems(new Set());
-            setWrongClicks(new Set());
-            setShowSuccess(false);
-          }
-        }, 1000);
+        setTimeout(() => advanceToNext(), 1000);
       }
     } else {
-      // Wrong click
+      // Wrong click - mark it
       const newWrong = new Set(wrongClicks);
       newWrong.add(key);
       setWrongClicks(newWrong);
-
-      // Check max attempts
-      if (totalAttempts + 1 >= MAX_ATTEMPTS) {
-        onTrialComplete({
-          trial_index: currentTrialIndex,
-          user_response: JSON.stringify({ 
-            tasksCompleted: currentTask,
-            totalAttempts: totalAttempts + 1,
-            level 
-          }),
-          response_time_ms: Date.now() - startTimeRef.current,
-          is_correct: false,
-          is_timed_out: false,
-          is_skipped: false,
-          started_at: new Date(startTimeRef.current).toISOString(),
-          responded_at: new Date().toISOString(),
-        });
-      }
     }
-  }, [showSuccess, foundItems, wrongClicks, getDifferentItem, totalDifferent, currentTask, totalAttempts, currentTrialIndex, searchConfig.id, onTrialComplete]);
+  }, [showSuccess, foundItems, wrongClicks, getDifferentItem, totalDifferent]);
+
+  // Advance to next puzzle or complete session
+  const advanceToNext = useCallback(() => {
+    const nextPuzzle = currentPuzzle + 1;
+    
+    if (nextPuzzle >= PUZZLES_PER_SESSION) {
+      // Session complete!
+      onTrialComplete({
+        trial_index: currentTrialIndex,
+        user_response: JSON.stringify({ 
+          puzzlesCompleted: PUZZLES_PER_SESSION,
+          wrongClicks: wrongClicks.size
+        }),
+        response_time_ms: Date.now() - startTimeRef.current,
+        is_correct: true,
+        is_timed_out: false,
+        is_skipped: false,
+        started_at: new Date(startTimeRef.current).toISOString(),
+        responded_at: new Date().toISOString(),
+      });
+    } else {
+      // Next puzzle
+      setCurrentPuzzle(nextPuzzle);
+    }
+  }, [currentPuzzle, wrongClicks.size, currentTrialIndex, onTrialComplete]);
 
   // Generate grid
   const renderGrid = () => {
@@ -255,17 +217,18 @@ export function VisualSearch({ config, currentTrialIndex, onTrialComplete }: Exe
       <h2 className="text-white text-2xl font-bold">
         {totalDifferent === 0 
           ? 'Are they all the same?' 
-          : `Find the Different Item${totalDifferent > 1 ? 's' : ''}!`}
+          : 'Find the Different One!'}
       </h2>
       
-      <div className="text-slate-400 text-sm flex gap-6">
-        <span>Level: {searchConfig.id} / 15</span>
-        <span>Task: {currentTask + 1} / {TASKS_PER_SESSION}</span>
-        {totalDifferent > 0 && <span>Found: {foundItems.size} / {totalDifferent}</span>}
-        <span>Attempts: {totalAttempts}</span>
+      {/* Progress and difficulty indicator */}
+      <div className="flex items-center gap-4 text-slate-300">
+        <span className="text-lg">Puzzle {currentPuzzle + 1} of {PUZZLES_PER_SESSION}</span>
+        <span className="px-2 py-1 bg-slate-700 rounded text-sm">
+          Level {difficulty} • {gridSize}×{actualRows} grid
+        </span>
       </div>
 
-      <p className="text-slate-300 text-sm">
+      <p className="text-slate-400 text-sm">
         {description}
       </p>
 
@@ -274,14 +237,16 @@ export function VisualSearch({ config, currentTrialIndex, onTrialComplete }: Exe
       {showSuccess && (
         <div className="text-green-400 text-xl font-bold animate-pulse">
           {totalDifferent === 0 
-            ? '✓ Correct - All the same!' 
-            : `🎉 Found ${totalDifferent > 1 ? 'them all' : 'it'}! 🎉`}
+            ? '✓ Correct!' 
+            : '🎉 Found it! 🎉'}
         </div>
       )}
 
-      <div className="text-slate-500 text-sm">
-        Grid: {gridSize}×{actualRows} | Black silhouettes
-      </div>
+      {wrongClicks.size > 0 && !showSuccess && (
+        <div className="text-slate-500 text-sm">
+          Keep looking...
+        </div>
+      )}
     </div>
   );
 }

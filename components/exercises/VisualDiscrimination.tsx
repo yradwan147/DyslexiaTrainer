@@ -1,19 +1,16 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import type { ExerciseProps } from '@/lib/exercises/types';
 import { 
-  VISUAL_DISCRIMINATION_PAIRS_CONFIGS,
-  getDiscriminationConfig,
+  generateVisualDiscriminationConfig,
   type CompositeShape,
-  type ShapeElement 
+  type ShapeElement,
+  type VisualDiscriminationPairsConfig
 } from '@/lib/exercises/visualDiscriminationPairsData';
 
-// Generate a session seed for reproducible but unique puzzles
-function getSessionSeed(): number {
-  const today = new Date();
-  return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-}
+// 5 unique puzzles per session
+const PUZZLES_PER_SESSION = 5;
 
 interface OptionState {
   eliminated: boolean;
@@ -83,13 +80,12 @@ function renderShapeElement(element: ShapeElement, size: number, key: string) {
     }
     
     case 'diamond': {
-      // Diamond is a rotated square
       const half = elemSize / 2;
       const points = [
-        [cx, cy - half], // Top
-        [cx + half, cy], // Right
-        [cx, cy + half], // Bottom
-        [cx - half, cy], // Left
+        [cx, cy - half],
+        [cx + half, cy],
+        [cx, cy + half],
+        [cx - half, cy],
       ];
       return (
         <polygon
@@ -172,11 +168,8 @@ function renderShapeElement(element: ShapeElement, size: number, key: string) {
       const headSize = arrowLen * 0.5;
       const rad = (element.rotation * Math.PI) / 180;
       
-      // Arrow shaft
       const shaftStart = [0, arrowLen / 2];
       const shaftEnd = [0, -arrowLen / 2 + headSize * 0.3];
-      
-      // Arrow head
       const headLeft = [-headSize / 2, -arrowLen / 2 + headSize];
       const headRight = [headSize / 2, -arrowLen / 2 + headSize];
       const headTip = [0, -arrowLen / 2];
@@ -240,34 +233,75 @@ function ShapeDisplay({ shape, size = 120 }: { shape: CompositeShape; size?: num
 }
 
 export function VisualDiscrimination({ config, currentTrialIndex, onTrialComplete }: ExerciseProps) {
+  // Get difficulty from config (1-5)
+  const difficulty = config.difficulty_level || 1;
+  
+  // Generate a unique session seed when component mounts
+  const sessionSeed = useMemo(() => Date.now() + Math.random() * 1000000, []);
+  
+  // Pre-generate all puzzles for this session - difficulty affects subtlety of differences
+  const sessionPuzzles = useMemo(() => {
+    const puzzles: VisualDiscriminationPairsConfig[] = [];
+    
+    for (let i = 0; i < PUZZLES_PER_SESSION; i++) {
+      // Each puzzle is procedurally generated with random shape variations
+      puzzles.push(generateVisualDiscriminationConfig(i, sessionSeed + i * 99999, difficulty));
+    }
+    
+    return puzzles;
+  }, [sessionSeed, difficulty]);
+
+  const [currentPuzzle, setCurrentPuzzle] = useState(0);
   const [optionStates, setOptionStates] = useState<OptionState[]>([]);
-  const [attempts, setAttempts] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [currentItem, setCurrentItem] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
 
-  // Items per session - progress through different configurations
-  const ITEMS_PER_SESSION = 4;
-  const [sessionSeed] = useState(() => getSessionSeed() + currentTrialIndex * 100);
-  
-  // Get configuration - uses procedural generation for variety
-  const discConfig = getDiscriminationConfig(currentItem, sessionSeed);
+  // Get current puzzle configuration
+  const puzzleConfig = sessionPuzzles[currentPuzzle];
 
-  // Reset on trial change
+  // Reset option states when moving to a new puzzle
   useEffect(() => {
-    setOptionStates(discConfig.options.map(() => ({ eliminated: false, selected: false })));
-    setAttempts(0);
+    setOptionStates(puzzleConfig.options.map(() => ({ eliminated: false, selected: false })));
     setShowSuccess(false);
-    setCurrentItem(0);
+  }, [currentPuzzle, puzzleConfig.options]);
+
+  // Reset everything when exercise restarts
+  useEffect(() => {
+    setCurrentPuzzle(0);
+    setOptionStates(puzzleConfig.options.map(() => ({ eliminated: false, selected: false })));
+    setShowSuccess(false);
     startTimeRef.current = Date.now();
-  }, [currentTrialIndex, discConfig]);
+  }, [currentTrialIndex]);
+
+  // Advance to next puzzle or complete session
+  const advanceToNext = useCallback(() => {
+    const nextPuzzle = currentPuzzle + 1;
+    
+    if (nextPuzzle >= PUZZLES_PER_SESSION) {
+      // Session complete!
+      onTrialComplete({
+        trial_index: currentTrialIndex,
+        user_response: JSON.stringify({ 
+          puzzlesCompleted: PUZZLES_PER_SESSION
+        }),
+        response_time_ms: Date.now() - startTimeRef.current,
+        is_correct: true,
+        is_timed_out: false,
+        is_skipped: false,
+        started_at: new Date(startTimeRef.current).toISOString(),
+        responded_at: new Date().toISOString(),
+      });
+    } else {
+      // Next puzzle
+      setCurrentPuzzle(nextPuzzle);
+    }
+  }, [currentPuzzle, currentTrialIndex, onTrialComplete]);
 
   // Handle option click
   const handleOptionClick = useCallback((index: number) => {
     if (optionStates[index]?.eliminated || showSuccess) return;
 
-    const isCorrect = index === discConfig.correctIndex;
-    setAttempts(prev => prev + 1);
+    const isCorrect = index === puzzleConfig.correctIndex;
 
     if (isCorrect) {
       // Show success and advance
@@ -276,100 +310,80 @@ export function VisualDiscrimination({ config, currentTrialIndex, onTrialComplet
         i === index ? { ...s, selected: true } : s
       ));
 
-      setTimeout(() => {
-        const newItem = currentItem + 1;
-        
-        if (newItem >= ITEMS_PER_SESSION) {
-          // Session complete
-          onTrialComplete({
-            trial_index: currentTrialIndex,
-            user_response: JSON.stringify({ items: ITEMS_PER_SESSION, attempts }),
-            response_time_ms: Date.now() - startTimeRef.current,
-            is_correct: true,
-            is_timed_out: false,
-            is_skipped: false,
-            started_at: new Date(startTimeRef.current).toISOString(),
-            responded_at: new Date().toISOString(),
-          });
-        } else {
-          // Next item - reset states
-          setCurrentItem(newItem);
-          setShowSuccess(false);
-          setOptionStates(discConfig.options.map(() => ({ eliminated: false, selected: false })));
-          startTimeRef.current = Date.now();
-        }
-      }, 1000);
+      setTimeout(() => advanceToNext(), 1000);
     } else {
       // Cross out wrong option
       setOptionStates(prev => prev.map((s, i) => 
         i === index ? { ...s, eliminated: true } : s
       ));
     }
-  }, [optionStates, showSuccess, discConfig, currentItem, attempts, currentTrialIndex, onTrialComplete]);
+  }, [optionStates, showSuccess, puzzleConfig.correctIndex, advanceToNext]);
 
   return (
     <div className="flex flex-col items-center gap-8">
       <h2 className="text-white text-2xl font-bold">Find the Matching Shape</h2>
       
-      <div className="text-slate-400 text-sm flex gap-6">
-        <span>Level: {discConfig.id} / 15</span>
-        <span>Item: {currentItem + 1} / {ITEMS_PER_SESSION}</span>
-        <span>Attempts: {attempts}</span>
+      {/* Progress and difficulty indicator */}
+      <div className="flex items-center gap-4 text-slate-300">
+        <span className="text-lg">Puzzle {currentPuzzle + 1} of {PUZZLES_PER_SESSION}</span>
+        <span className="px-2 py-1 bg-slate-700 rounded text-sm">
+          Level {difficulty}
+        </span>
       </div>
 
-      <p className="text-slate-300 text-sm">{discConfig.description}</p>
+      {/* Target shape */}
+      <div className="bg-white rounded-2xl p-6 shadow-lg">
+        <p className="text-slate-500 text-sm text-center mb-2">Find this shape:</p>
+        <ShapeDisplay shape={puzzleConfig.target} size={150} />
+      </div>
 
-      {/* Target shape at top */}
-      <div className="flex flex-col items-center gap-2">
-        <span className="text-slate-400 text-sm">Target:</span>
-        <div className="bg-slate-200 rounded-2xl p-4 shadow-lg">
-          <ShapeDisplay shape={discConfig.target} size={150} />
+      {/* Options grid */}
+      <div className="grid grid-cols-2 gap-4">
+        {puzzleConfig.options.map((option, index) => {
+          const state = optionStates[index] || { eliminated: false, selected: false };
+          
+          return (
+            <button
+              key={index}
+              onClick={() => handleOptionClick(index)}
+              disabled={state.eliminated || showSuccess}
+              className={`
+                relative bg-white rounded-xl p-4 shadow-lg transition-all
+                ${state.selected ? 'ring-4 ring-green-500 bg-green-50' : ''}
+                ${state.eliminated ? 'opacity-50' : 'hover:scale-105'}
+                ${!state.eliminated && !showSuccess ? 'cursor-pointer' : 'cursor-default'}
+              `}
+            >
+              <ShapeDisplay shape={option} size={100} />
+              
+              {/* Crossed out indicator */}
+              {state.eliminated && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-red-500 text-6xl font-bold">✗</span>
+                </div>
+              )}
+              
+              {/* Correct indicator */}
+              {state.selected && (
+                <div className="absolute -top-2 -right-2">
+                  <span className="text-green-500 text-3xl">✓</span>
+                </div>
+              )}
+              
+              {/* Option number */}
+              <div className="absolute bottom-1 right-2 text-slate-400 text-sm">
+                {index + 1}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {showSuccess && (
+        <div className="text-green-400 text-xl font-bold animate-pulse">
+          🎉 Correct! 🎉
         </div>
-      </div>
-
-      {/* Options below */}
-      <div className="flex flex-col items-center gap-2">
-        <span className="text-slate-400 text-sm">Find the exact match:</span>
-        <div className="flex gap-4 flex-wrap justify-center">
-          {discConfig.options.map((option, index) => {
-            const state = optionStates[index] || { eliminated: false, selected: false };
-            
-            return (
-              <button
-                key={index}
-                onClick={() => handleOptionClick(index)}
-                disabled={state.eliminated || showSuccess}
-                className={`
-                  relative bg-slate-200 rounded-2xl p-3 transition-all duration-200
-                  ${!state.eliminated && !showSuccess ? 'hover:bg-slate-300 hover:shadow-lg cursor-pointer' : ''}
-                  ${state.eliminated ? 'opacity-50' : ''}
-                  ${state.selected ? 'ring-4 ring-green-500' : ''}
-                `}
-              >
-                <ShapeDisplay shape={option} size={120} />
-                
-                {/* Eliminated overlay */}
-                {state.eliminated && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-6xl text-red-500 font-bold">✗</span>
-                  </div>
-                )}
-                
-                {/* Correct overlay */}
-                {state.selected && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-green-500/20 rounded-2xl">
-                    <span className="text-6xl text-green-500">✓</span>
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <p className="text-slate-400 text-sm">
-        Click on the shape that exactly matches the target above
-      </p>
+      )}
     </div>
   );
 }

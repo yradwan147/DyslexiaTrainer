@@ -315,19 +315,19 @@ const ITEM_CATEGORIES: Record<string, string[]> = {
 const ALL_ITEMS = Object.values(ITEM_CATEGORIES).flat();
 
 // Generate a procedural memory sequence
-export function generateMemorySequence(taskIndex: number, sessionSeed: number = Date.now()): MemorySequence {
+// Difficulty affects: sequence length (3-7) and item similarity
+// Level 1: 3 items, different categories | Level 5: 7 items, same category
+export function generateMemorySequence(taskIndex: number, sessionSeed: number = Date.now(), difficulty: number = 1): MemorySequence {
   const rng = seededRandom(sessionSeed + taskIndex * 1000);
   
-  // Determine sequence length (3-7 items)
-  const itemCount = 3 + Math.floor(rng() * 5);
+  // Sequence length increases with difficulty: 3, 4, 5, 6, 7
+  const itemCount = 2 + difficulty;
   
-  // Determine difficulty level based on selection strategy
-  const level = 1 + Math.floor(rng() * 3);
-  
+  // Higher difficulty = more visually similar items
   let sequence: string[];
   
-  if (level === 1) {
-    // Level 1: Visually different - pick from DIFFERENT categories
+  if (difficulty <= 2) {
+    // Easy: Visually different - pick from DIFFERENT categories
     const shuffledCategories = shuffleArraySeeded(Object.keys(ITEM_CATEGORIES), rng);
     sequence = [];
     for (let i = 0; i < itemCount; i++) {
@@ -335,8 +335,8 @@ export function generateMemorySequence(taskIndex: number, sessionSeed: number = 
       const items = ITEM_CATEGORIES[category];
       sequence.push(items[Math.floor(rng() * items.length)]);
     }
-  } else if (level === 2) {
-    // Level 2: Mix - some from same category, some from different
+  } else if (difficulty === 3) {
+    // Medium: Mix - some from same category, some from different
     const primaryCategory = Object.keys(ITEM_CATEGORIES)[Math.floor(rng() * Object.keys(ITEM_CATEGORIES).length)];
     const primaryItems = shuffleArraySeeded(ITEM_CATEGORIES[primaryCategory], rng);
     const otherItems = shuffleArraySeeded(ALL_ITEMS.filter(i => !ITEM_CATEGORIES[primaryCategory].includes(i)), rng);
@@ -351,7 +351,7 @@ export function generateMemorySequence(taskIndex: number, sessionSeed: number = 
     }
     sequence = shuffleArraySeeded(sequence, rng);
   } else {
-    // Level 3: Visually similar - pick from SAME category
+    // Hard (4-5): Visually similar - pick from SAME category
     const category = Object.keys(ITEM_CATEGORIES)[Math.floor(rng() * Object.keys(ITEM_CATEGORIES).length)];
     const items = shuffleArraySeeded(ITEM_CATEGORIES[category], rng);
     sequence = items.slice(0, Math.min(itemCount, items.length));
@@ -367,7 +367,7 @@ export function generateMemorySequence(taskIndex: number, sessionSeed: number = 
   
   return {
     id: 100 + taskIndex,
-    level,
+    level: difficulty,
     itemCount,
     sequence,
   };

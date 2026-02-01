@@ -475,8 +475,13 @@ function shuffleArray<T>(array: T[], rng: () => number): T[] {
 }
 
 // Generate a procedural letter-number matching config
-export function generateLineTrackingConfig(taskIndex: number, sessionSeed: number = Date.now()): LineTrackingConfig {
+// Difficulty affects number of lines: Level 1 = 3-4 lines, Level 5 = 7-8 lines
+export function generateLineTrackingConfig(taskIndex: number, sessionSeed: number = Date.now(), difficulty: number = 1): LineTrackingConfig {
   const rng = seededRandom(sessionSeed + taskIndex * 1000);
+  
+  // Item count increases with difficulty: 3-4, 4-5, 5-6, 6-7, 7-8
+  const baseCount = 2 + difficulty; // 3, 4, 5, 6, 7
+  const itemCount = baseCount + Math.floor(rng() * 2); // +0-1 random
   
   // Determine type: image-based (first 4) or letter-based (rest)
   const useImages = taskIndex < 4 && rng() > 0.3;
@@ -485,7 +490,6 @@ export function generateLineTrackingConfig(taskIndex: number, sessionSeed: numbe
     // Image-based puzzle
     const pairIndex = taskIndex % IMAGE_PAIRS.length;
     const pair = IMAGE_PAIRS[pairIndex];
-    const itemCount = 4 + Math.floor(rng() * 2); // 4-5 items
     
     const leftItems: LineItem[] = Array(itemCount).fill(null).map(() => ({ 
       type: 'image' as const, 
@@ -509,7 +513,7 @@ export function generateLineTrackingConfig(taskIndex: number, sessionSeed: numbe
     
     return {
       id: 100 + taskIndex,
-      level: 2,
+      level: difficulty,
       exercise: taskIndex + 1,
       title: 'Kdo je kaj izgubil?',
       leftItems,
@@ -520,7 +524,6 @@ export function generateLineTrackingConfig(taskIndex: number, sessionSeed: numbe
     };
   } else {
     // Letter-number matching puzzle
-    const itemCount = 4 + Math.floor(rng() * 3); // 4-6 items
     const uppercase = rng() > 0.5;
     const letters = uppercase 
       ? ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
@@ -556,7 +559,7 @@ export function generateLineTrackingConfig(taskIndex: number, sessionSeed: numbe
     
     return {
       id: 100 + taskIndex,
-      level: 3 + Math.floor(rng() * 3),
+      level: difficulty,
       exercise: taskIndex + 1,
       title: 'Kdo je kaj izgubil?',
       leftItems,

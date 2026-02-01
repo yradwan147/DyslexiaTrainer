@@ -481,25 +481,32 @@ interface ShapeTemplate {
   variations: ((shapes: ShapeElement[], rng: () => number) => ShapeElement[])[];
 }
 
-// Create subtle variations of shapes
-function variatePosition(shapes: ShapeElement[], rng: () => number): ShapeElement[] {
+// Create variations of shapes - subtlety controlled by difficulty
+// Higher difficulty = more subtle differences (harder to spot)
+function variatePosition(shapes: ShapeElement[], rng: () => number, subtlety: number = 1): ShapeElement[] {
   const targetIdx = Math.floor(rng() * shapes.length);
-  return shapes.map((s, i) => i === targetIdx ? { ...s, x: s.x + (rng() - 0.5) * 20, y: s.y + (rng() - 0.5) * 20 } : s);
+  // Less movement at higher difficulty (more subtle)
+  const moveAmount = 30 / subtlety; // 30, 15, 10, 7.5, 6
+  return shapes.map((s, i) => i === targetIdx ? { ...s, x: s.x + (rng() - 0.5) * moveAmount, y: s.y + (rng() - 0.5) * moveAmount } : s);
 }
 
-function variateSize(shapes: ShapeElement[], rng: () => number): ShapeElement[] {
+function variateSize(shapes: ShapeElement[], rng: () => number, subtlety: number = 1): ShapeElement[] {
   const targetIdx = Math.floor(rng() * shapes.length);
-  const factor = rng() > 0.5 ? 1.2 : 0.8;
+  // Smaller size change at higher difficulty
+  const change = 0.3 / subtlety; // 0.3, 0.15, 0.1, 0.075, 0.06
+  const factor = rng() > 0.5 ? 1 + change : 1 - change;
   return shapes.map((s, i) => i === targetIdx ? { ...s, size: s.size * factor } : s);
 }
 
-function variateRotation(shapes: ShapeElement[], rng: () => number): ShapeElement[] {
+function variateRotation(shapes: ShapeElement[], rng: () => number, subtlety: number = 1): ShapeElement[] {
   const targetIdx = Math.floor(rng() * shapes.length);
-  return shapes.map((s, i) => i === targetIdx ? { ...s, rotation: s.rotation + (rng() - 0.5) * 60 } : s);
+  // Smaller rotation at higher difficulty
+  const rotAmount = 60 / subtlety; // 60, 30, 20, 15, 12
+  return shapes.map((s, i) => i === targetIdx ? { ...s, rotation: s.rotation + (rng() - 0.5) * rotAmount } : s);
 }
 
-function removeShape(shapes: ShapeElement[], rng: () => number): ShapeElement[] {
-  if (shapes.length <= 1) return variatePosition(shapes, rng);
+function removeShape(shapes: ShapeElement[], rng: () => number, subtlety: number = 1): ShapeElement[] {
+  if (shapes.length <= 1) return variatePosition(shapes, rng, subtlety);
   const targetIdx = Math.floor(rng() * shapes.length);
   return shapes.filter((_, i) => i !== targetIdx);
 }
@@ -528,11 +535,17 @@ const SHAPE_TEMPLATES: (() => ShapeElement[])[] = [
   () => [circle(50, 50, 75), diamond(50, 50, 35)],
 ];
 
-const VARIATION_FUNCTIONS = [variatePosition, variateSize, variateRotation, removeShape];
+// Variation functions that accept subtlety parameter
+type VariationFn = (shapes: ShapeElement[], rng: () => number, subtlety: number) => ShapeElement[];
+const VARIATION_FUNCTIONS: VariationFn[] = [variatePosition, variateSize, variateRotation, removeShape];
 
 // Generate a procedural visual discrimination puzzle
-export function generateVisualDiscriminationConfig(taskIndex: number, sessionSeed: number = Date.now()): VisualDiscriminationPairsConfig {
+// Difficulty affects subtlety: Level 1 = obvious differences, Level 5 = very subtle
+export function generateVisualDiscriminationConfig(taskIndex: number, sessionSeed: number = Date.now(), difficulty: number = 1): VisualDiscriminationPairsConfig {
   const rng = seededRandom(sessionSeed + taskIndex * 1000);
+  
+  // Subtlety increases with difficulty
+  const subtlety = difficulty;
   
   // Pick a template
   const templateIdx = taskIndex % SHAPE_TEMPLATES.length;
@@ -553,7 +566,7 @@ export function generateVisualDiscriminationConfig(taskIndex: number, sessionSee
     }
     usedVariations.push(variationIdx);
     
-    const variedElements = VARIATION_FUNCTIONS[variationIdx]([...baseShapes], rng);
+    const variedElements = VARIATION_FUNCTIONS[variationIdx]([...baseShapes], rng, subtlety);
     wrongOptions.push({ elements: variedElements });
   }
   

@@ -6,12 +6,12 @@ import type { ExerciseProps } from '@/lib/exercises/types';
 const MOVEMENTS_PER_TRIAL = 10;
 const TRIALS_PER_SESSION = 5;
 
-// Circle sizes based on level (approximate cm to pixels, assuming ~96 DPI)
-// 1cm ≈ 38 pixels, so 3cm ≈ 57px radius (114px diameter), 2cm ≈ 38px radius, 1cm ≈ 19px radius
-function getCircleRadius(level: number): number {
-  if (level <= 5) return 57;  // 3cm diameter
-  if (level <= 10) return 38; // 2cm diameter
-  return 19; // 1cm diameter
+// Circle radius scales with difficulty (1-5)
+// Level 1: 60px (largest, easiest)
+// Level 5: 20px (smallest, hardest)
+function getCircleRadius(difficulty: number): number {
+  // Linear scale: 60px at level 1, 20px at level 5
+  return 60 - (difficulty - 1) * 10; // 60, 50, 40, 30, 20
 }
 
 export function VisualSaccades({ config, currentTrialIndex, onTrialComplete }: ExerciseProps) {
@@ -176,10 +176,9 @@ export function VisualSaccades({ config, currentTrialIndex, onTrialComplete }: E
   }, [circlePos, circleRadius, isHovered, width, height]);
 
   // Calculate size label
-  const getSizeLabel = (level: number) => {
-    if (level <= 5) return '3 cm';
-    if (level <= 10) return '2 cm';
-    return '1 cm';
+  const getSizeLabel = (difficulty: number) => {
+    const radius = getCircleRadius(difficulty);
+    return `${radius * 2}px circle`;
   };
 
   return (

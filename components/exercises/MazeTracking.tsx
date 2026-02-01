@@ -1,44 +1,53 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import type { ExerciseProps } from '@/lib/exercises/types';
 import { 
-  MAZE_CONFIGS,
-  getMazeTrackingConfig,
-  type MazeConfig, 
-  type WallSegment,
+  generateMazeConfig,
+  type MazeConfig,
   getCharacterEmoji,
   getCollectibleEmoji 
 } from '@/lib/exercises/mazeTrackingData';
 
-// Generate a session seed for reproducible but unique puzzles
-function getSessionSeed(): number {
-  const today = new Date();
-  return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-}
-
+// 5 unique mazes per session
 const MAZES_PER_SESSION = 5;
 
 export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: ExerciseProps) {
+  // Get difficulty from config (1-5)
+  const difficulty = config.difficulty_level || 1;
+  
+  // Generate a unique session seed when component mounts
+  const sessionSeed = useMemo(() => Date.now() + Math.random() * 1000000, []);
+  
+  // Pre-generate all mazes for this session - difficulty affects size and collectibles
+  const sessionMazes = useMemo(() => {
+    const mazes: MazeConfig[] = [];
+    
+    for (let i = 0; i < MAZES_PER_SESSION; i++) {
+      // Each maze is procedurally generated with random walls and collectibles
+      mazes.push(generateMazeConfig(i, sessionSeed + i * 54321, difficulty));
+    }
+    
+    return mazes;
+  }, [sessionSeed, difficulty]);
+
+  const [currentMaze, setCurrentMaze] = useState(0);
   const [clickedCollectibles, setClickedCollectibles] = useState<Set<number>>(new Set());
   const [nextExpectedOrder, setNextExpectedOrder] = useState(1);
   const [wrongClicks, setWrongClicks] = useState(0);
   const [showWrongFeedback, setShowWrongFeedback] = useState<{ row: number; col: number } | null>(null);
   const [isComplete, setIsComplete] = useState(false);
-  const [currentMaze, setCurrentMaze] = useState(0);
-  const [sessionSeed] = useState(() => getSessionSeed() + currentTrialIndex * 100);
   const startTimeRef = useRef<number>(Date.now());
 
-  // Get maze configuration - uses procedural generation for variety
-  const mazeConfig = getMazeTrackingConfig(currentMaze, sessionSeed);
-
+  // Get current maze configuration
+  const mazeConfig = sessionMazes[currentMaze];
   const { gridSize, walls, collectibles, characterType, characterPosition, collectibleType } = mazeConfig;
   
   // Calculate cell size based on grid size
   const mazeSize = 450;
   const cellSize = mazeSize / gridSize;
 
-  // Reset on maze change
+  // Reset state when moving to a new maze
   useEffect(() => {
     setClickedCollectibles(new Set());
     setNextExpectedOrder(1);
@@ -46,14 +55,14 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
     setIsComplete(false);
   }, [currentMaze]);
 
-  // Reset everything on new trial
+  // Reset everything when exercise restarts
   useEffect(() => {
+    setCurrentMaze(0);
     setClickedCollectibles(new Set());
     setNextExpectedOrder(1);
     setWrongClicks(0);
     setShowWrongFeedback(null);
     setIsComplete(false);
-    setCurrentMaze(0);
     startTimeRef.current = Date.now();
   }, [currentTrialIndex]);
 
@@ -61,6 +70,31 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
   const getCollectibleAt = useCallback((row: number, col: number) => {
     return collectibles.find(c => c.row === row && c.col === col);
   }, [collectibles]);
+
+  // Advance to next maze or complete session
+  const advanceToNext = useCallback(() => {
+    const nextMaze = currentMaze + 1;
+    
+    if (nextMaze >= MAZES_PER_SESSION) {
+      // Session complete!
+      onTrialComplete({
+        trial_index: currentTrialIndex,
+        user_response: JSON.stringify({ 
+          mazesCompleted: MAZES_PER_SESSION,
+          wrongClicks
+        }),
+        response_time_ms: Date.now() - startTimeRef.current,
+        is_correct: true,
+        is_timed_out: false,
+        is_skipped: false,
+        started_at: new Date(startTimeRef.current).toISOString(),
+        responded_at: new Date().toISOString(),
+      });
+    } else {
+      // Next maze
+      setCurrentMaze(nextMaze);
+    }
+  }, [currentMaze, wrongClicks, currentTrialIndex, onTrialComplete]);
 
   // Handle collectible click
   const handleCollectibleClick = useCallback((row: number, col: number) => {
@@ -82,30 +116,7 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
       // Check if all collectibles collected
       if (newClicked.size === collectibles.length) {
         setIsComplete(true);
-        setTimeout(() => {
-          const nextMaze = currentMaze + 1;
-          
-          if (nextMaze >= MAZES_PER_SESSION) {
-            // Session complete
-            onTrialComplete({
-              trial_index: currentTrialIndex,
-              user_response: JSON.stringify({ 
-                mazesCompleted: nextMaze,
-                wrongClicks,
-                configId: mazeConfig.id
-              }),
-              response_time_ms: Date.now() - startTimeRef.current,
-              is_correct: true,
-              is_timed_out: false,
-              is_skipped: false,
-              started_at: new Date(startTimeRef.current).toISOString(),
-              responded_at: new Date().toISOString(),
-            });
-          } else {
-            // Next maze
-            setCurrentMaze(nextMaze);
-          }
-        }, 1000);
+        setTimeout(() => advanceToNext(), 1000);
       }
     } else {
       // Wrong order
@@ -113,21 +124,25 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
       setShowWrongFeedback({ row, col });
       setTimeout(() => setShowWrongFeedback(null), 500);
     }
-  }, [isComplete, getCollectibleAt, clickedCollectibles, nextExpectedOrder, collectibles.length, wrongClicks, currentTrialIndex, currentMaze, mazeConfig.id, onTrialComplete]);
+  }, [isComplete, getCollectibleAt, clickedCollectibles, nextExpectedOrder, collectibles.length, advanceToNext]);
 
   // Get character start position based on characterPosition
-  const getCharacterPos = (): { row: number; col: number } | null => {
+  const getCharacterPosition = () => {
     switch (characterPosition) {
-      case 'top-left': return { row: -0.5, col: -0.5 };
-      case 'left': return { row: Math.floor(gridSize / 2), col: -0.5 };
-      case 'bottom-right': return { row: gridSize - 0.5, col: gridSize + 0.5 };
-      default: return null;
+      case 'top-left':
+        return { x: -cellSize * 0.8, y: cellSize * 0.5 };
+      case 'left':
+        return { x: -cellSize * 0.8, y: mazeSize / 2 };
+      case 'bottom-right':
+        return { x: mazeSize + cellSize * 0.3, y: mazeSize - cellSize * 0.5 };
+      default:
+        return { x: -cellSize * 0.8, y: cellSize * 0.5 };
     }
   };
 
-  const characterPos = getCharacterPos();
+  const charPos = getCharacterPosition();
 
-  // Render wall segments as SVG paths
+  // Render wall segments as SVG lines
   const renderWalls = () => {
     return walls.map((wall, idx) => {
       const { type, row, col, length } = wall;
@@ -137,7 +152,7 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
         const x1 = col * cellSize;
         const y1 = row * cellSize;
         const x2 = (col + length) * cellSize;
-        const y2 = row * cellSize;
+        const y2 = y1;
         return (
           <line
             key={`wall-${idx}`}
@@ -145,8 +160,8 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
             y1={y1}
             x2={x2}
             y2={y2}
-            stroke="#1e293b"
-            strokeWidth={3}
+            stroke="#374151"
+            strokeWidth="3"
             strokeLinecap="round"
           />
         );
@@ -154,7 +169,7 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
         // Vertical wall
         const x1 = col * cellSize;
         const y1 = row * cellSize;
-        const x2 = col * cellSize;
+        const x2 = x1;
         const y2 = (row + length) * cellSize;
         return (
           <line
@@ -163,8 +178,8 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
             y1={y1}
             x2={x2}
             y2={y2}
-            stroke="#1e293b"
-            strokeWidth={3}
+            stroke="#374151"
+            strokeWidth="3"
             strokeLinecap="round"
           />
         );
@@ -174,58 +189,71 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
 
   // Render collectibles
   const renderCollectibles = () => {
-    return collectibles.map((collectible, idx) => {
+    return collectibles.map((collectible) => {
       const { row, col, order } = collectible;
-      const isClicked = clickedCollectibles.has(order);
-      const isNext = order === nextExpectedOrder;
-      const isLast = order === collectibles.length;
-      const hasWrongFeedback = showWrongFeedback?.row === row && showWrongFeedback?.col === col;
-      
       const cx = (col + 0.5) * cellSize;
       const cy = (row + 0.5) * cellSize;
-      
+      const isCollected = clickedCollectibles.has(order);
+      const isNext = order === nextExpectedOrder;
+      const isWrongClick = showWrongFeedback?.row === row && showWrongFeedback?.col === col;
+      const isLast = order === collectibles.length;
+
       return (
-        <g key={`collectible-${idx}`}>
-          {/* Background circle for highlighting */}
-          {isNext && !isClicked && (
+        <g key={`collectible-${order}`}>
+          {/* Highlight next collectible */}
+          {isNext && !isCollected && (
             <circle
               cx={cx}
               cy={cy}
               r={cellSize * 0.4}
-              fill="rgba(250, 204, 21, 0.3)"
-              stroke="#facc15"
-              strokeWidth={2}
+              fill="rgba(34, 197, 94, 0.3)"
               className="animate-pulse"
             />
           )}
-          {hasWrongFeedback && (
+          
+          {/* Wrong click feedback */}
+          {isWrongClick && (
             <circle
               cx={cx}
               cy={cy}
               r={cellSize * 0.4}
-              fill="rgba(239, 68, 68, 0.3)"
+              fill="rgba(239, 68, 68, 0.5)"
             />
           )}
-          {/* Clickable area */}
+          
+          {/* Collectible button */}
           <circle
             cx={cx}
             cy={cy}
             r={cellSize * 0.35}
-            fill={isClicked ? 'rgba(34, 197, 94, 0.2)' : 'transparent'}
-            stroke="transparent"
-            className={!isClicked ? 'cursor-pointer hover:fill-yellow-100' : ''}
+            fill={isCollected ? '#86efac' : '#fef3c7'}
+            stroke={isCollected ? '#22c55e' : '#f59e0b'}
+            strokeWidth="2"
+            style={{ cursor: isCollected ? 'default' : 'pointer' }}
             onClick={() => handleCollectibleClick(row, col)}
           />
-          {/* Emoji */}
+          
+          {/* Collectible emoji */}
           <text
             x={cx}
-            y={cy}
+            y={cy + 5}
             textAnchor="middle"
-            dominantBaseline="central"
-            fontSize={cellSize * 0.5}
+            fontSize={cellSize * 0.35}
             style={{ pointerEvents: 'none' }}
           >
-            {isClicked ? '✅' : (hasWrongFeedback ? '❌' : getCollectibleEmoji(collectibleType, isLast))}
+            {isCollected ? '✓' : getCollectibleEmoji(collectibleType, isLast)}
+          </text>
+          
+          {/* Order number */}
+          <text
+            x={cx}
+            y={cy - cellSize * 0.25}
+            textAnchor="middle"
+            fontSize={10}
+            fill="#6b7280"
+            style={{ pointerEvents: 'none' }}
+          >
+            {order}
           </text>
         </g>
       );
@@ -234,71 +262,54 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <h2 className="text-white text-2xl font-bold">Find the Path & Collect Treasures!</h2>
+      <h2 className="text-white text-2xl font-bold">Collect the Treasures!</h2>
       
-      <div className="text-slate-400 text-sm flex gap-6">
-        <span>Maze: {currentMaze + 1} / {MAZES_PER_SESSION}</span>
-        <span>Collected: {clickedCollectibles.size} / {collectibles.length}</span>
-        <span>Wrong clicks: {wrongClicks}</span>
-        <span>Config: {mazeConfig.id}</span>
+      {/* Progress and difficulty indicator */}
+      <div className="flex items-center gap-4 text-slate-300">
+        <span className="text-lg">Maze {currentMaze + 1} of {MAZES_PER_SESSION}</span>
+        <span className="px-2 py-1 bg-slate-700 rounded text-sm">
+          Level {difficulty} • {gridSize}×{gridSize} maze
+        </span>
       </div>
 
-      <p className="text-slate-300 text-sm max-w-md text-center">
-        Follow the path with your eyes from the {getCharacterEmoji(characterType)} and click the {collectibleType}s in order!
+      <p className="text-slate-400 text-sm">
+        Click the items in order (1, 2, 3...)
       </p>
 
-      {/* Maze SVG */}
-      <div className="relative bg-white rounded-lg p-4 shadow-lg">
-        <svg
-          width={mazeSize}
-          height={mazeSize}
-          viewBox={`0 0 ${mazeSize} ${mazeSize}`}
-          className="border-2 border-slate-800"
+      {/* Maze container */}
+      <div className="relative bg-white rounded-2xl p-4 shadow-lg">
+        <svg 
+          width={mazeSize + cellSize} 
+          height={mazeSize + cellSize}
+          viewBox={`${-cellSize * 0.5} ${-cellSize * 0.5} ${mazeSize + cellSize} ${mazeSize + cellSize}`}
         >
-          {/* Background */}
-          <rect x={0} y={0} width={mazeSize} height={mazeSize} fill="white" />
-          
-          {/* Grid lines (light) */}
-          {Array.from({ length: gridSize + 1 }).map((_, i) => (
-            <g key={`grid-${i}`}>
-              <line
-                x1={0}
-                y1={i * cellSize}
-                x2={mazeSize}
-                y2={i * cellSize}
-                stroke="#e2e8f0"
-                strokeWidth={0.5}
-              />
-              <line
-                x1={i * cellSize}
-                y1={0}
-                x2={i * cellSize}
-                y2={mazeSize}
-                stroke="#e2e8f0"
-                strokeWidth={0.5}
-              />
-            </g>
-          ))}
+          {/* Background grid */}
+          <rect x="0" y="0" width={mazeSize} height={mazeSize} fill="#f8fafc" />
           
           {/* Walls */}
           {renderWalls()}
           
           {/* Collectibles */}
           {renderCollectibles()}
+          
+          {/* Character */}
+          {characterType !== 'none' && (
+            <text
+              x={charPos.x}
+              y={charPos.y}
+              fontSize={cellSize * 0.6}
+              textAnchor="middle"
+              dominantBaseline="middle"
+            >
+              {getCharacterEmoji(characterType)}
+            </text>
+          )}
         </svg>
-        
-        {/* Character (outside maze) */}
-        {characterPos && (
-          <div
-            className="absolute text-3xl"
-            style={{
-              left: characterPos.col < 0 ? -40 : (characterPos.col >= gridSize ? mazeSize + 20 : characterPos.col * cellSize),
-              top: characterPos.row < 0 ? -40 : (characterPos.row >= gridSize ? mazeSize + 20 : characterPos.row * cellSize),
-            }}
-          >
-            {getCharacterEmoji(characterType)}
-          </div>
-        )}
+      </div>
+
+      {/* Status */}
+      <div className="text-slate-400 text-sm flex gap-6">
+        <span>Collected: {clickedCollectibles.size} / {collectibles.length}</span>
       </div>
 
       {isComplete && (
@@ -306,10 +317,6 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
           🎉 Maze Complete! 🎉
         </div>
       )}
-
-      <p className="text-slate-500 text-xs">
-        Hint: Click on the items in order (1st, 2nd, 3rd...). The next one has a yellow highlight.
-      </p>
     </div>
   );
 }

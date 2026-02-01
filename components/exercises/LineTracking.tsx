@@ -1,14 +1,11 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import type { ExerciseProps, LineTrackingTrialConfig } from '@/lib/exercises/types';
-import { LINE_TRACKING_CONFIGS, getLineTrackingConfig, type LineTrackingConfig, type LineItem } from '@/lib/exercises/lineTrackingData';
+import { generateLineTrackingConfig, type LineTrackingConfig, type LineItem } from '@/lib/exercises/lineTrackingData';
 
-// Generate a session seed for reproducible but unique puzzles
-function getSessionSeed(): number {
-  const today = new Date();
-  return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-}
+// 5 unique line puzzles per session
+const PUZZLES_PER_SESSION = 5;
 
 // Generate curved path between two points with random-ish control points
 function generateCurvedPath(
@@ -100,40 +97,52 @@ function generateAngularPath(
   return path;
 }
 
-const CONFIGS_PER_SESSION = 5;
-
 export function LineTracking({ config, currentTrialIndex, onTrialComplete }: ExerciseProps) {
+  // Get difficulty from config (1-5)
+  const difficulty = config.difficulty_level || 1;
+  
+  // Generate a unique session seed when component mounts
+  const sessionSeed = useMemo(() => Date.now() + Math.random() * 1000000, []);
+  
+  // Pre-generate all puzzles for this session - difficulty affects number of lines
+  const sessionPuzzles = useMemo(() => {
+    const puzzles: LineTrackingConfig[] = [];
+    
+    for (let i = 0; i < PUZZLES_PER_SESSION; i++) {
+      // Each puzzle is procedurally generated with random items and connections
+      puzzles.push(generateLineTrackingConfig(i, sessionSeed + i * 77777, difficulty));
+    }
+    
+    return puzzles;
+  }, [sessionSeed, difficulty]);
+
+  const [currentPuzzle, setCurrentPuzzle] = useState(0);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [solvedLines, setSolvedLines] = useState<Set<number>>(new Set());
   const [wrongAttempts, setWrongAttempts] = useState(0);
   const [showFeedback, setShowFeedback] = useState<{ index: number; correct: boolean } | null>(null);
-  const [currentConfigNum, setCurrentConfigNum] = useState(0);
-  const [sessionSeed] = useState(() => getSessionSeed() + currentTrialIndex * 100);
   const startTimeRef = useRef<number>(Date.now());
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const trial = config.trials[currentTrialIndex] as LineTrackingTrialConfig;
-  
-  // Get the line tracking configuration - uses procedural generation for variety
-  const lineConfig = getLineTrackingConfig(currentConfigNum, sessionSeed);
-  
+  // Get current puzzle configuration
+  const lineConfig = sessionPuzzles[currentPuzzle];
   const itemCount = lineConfig.leftItems.length;
   const allSolved = solvedLines.size === itemCount;
 
-  // Reset on config change
+  // Reset state when moving to a new puzzle
   useEffect(() => {
     setCurrentLineIndex(0);
     setSolvedLines(new Set());
     setShowFeedback(null);
-  }, [currentConfigNum]);
+  }, [currentPuzzle]);
 
-  // Reset everything on new trial
+  // Reset everything when exercise restarts
   useEffect(() => {
+    setCurrentPuzzle(0);
     setCurrentLineIndex(0);
     setSolvedLines(new Set());
     setWrongAttempts(0);
     setShowFeedback(null);
-    setCurrentConfigNum(0);
     startTimeRef.current = Date.now();
   }, [currentTrialIndex]);
 
@@ -141,6 +150,31 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
   const findCorrectLeftIndex = useCallback((rightIndex: number): number => {
     return lineConfig.connections.findIndex(rightIdx => rightIdx === rightIndex);
   }, [lineConfig.connections]);
+
+  // Advance to next puzzle or complete session
+  const advanceToNext = useCallback(() => {
+    const nextPuzzle = currentPuzzle + 1;
+    
+    if (nextPuzzle >= PUZZLES_PER_SESSION) {
+      // Session complete!
+      onTrialComplete({
+        trial_index: currentTrialIndex,
+        user_response: JSON.stringify({ 
+          puzzlesCompleted: PUZZLES_PER_SESSION,
+          wrongAttempts
+        }),
+        response_time_ms: Date.now() - startTimeRef.current,
+        is_correct: true,
+        is_timed_out: false,
+        is_skipped: false,
+        started_at: new Date(startTimeRef.current).toISOString(),
+        responded_at: new Date().toISOString(),
+      });
+    } else {
+      // Next puzzle
+      setCurrentPuzzle(nextPuzzle);
+    }
+  }, [currentPuzzle, wrongAttempts, currentTrialIndex, onTrialComplete]);
 
   // Handle clicking on a left item
   const handleLeftClick = useCallback((leftIndex: number) => {
@@ -165,30 +199,9 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
           nextLine++;
         }
         
-        // If all solved in this config, move to next config or complete
+        // If all solved, move to next puzzle
         if (newSolved.size === itemCount) {
-          const nextConfig = currentConfigNum + 1;
-          
-          if (nextConfig >= CONFIGS_PER_SESSION) {
-            // Session complete
-            onTrialComplete({
-              trial_index: currentTrialIndex,
-              user_response: JSON.stringify({ 
-                configsCompleted: nextConfig, 
-                attempts: wrongAttempts,
-                configId: lineConfig.id
-              }),
-              response_time_ms: Date.now() - startTimeRef.current,
-              is_correct: true,
-              is_timed_out: false,
-              is_skipped: false,
-              started_at: new Date(startTimeRef.current).toISOString(),
-              responded_at: new Date().toISOString(),
-            });
-          } else {
-            // Next config
-            setCurrentConfigNum(nextConfig);
-          }
+          setTimeout(() => advanceToNext(), 800);
         } else if (nextLine < itemCount) {
           setCurrentLineIndex(nextLine);
         }
@@ -197,7 +210,7 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
       }
       setShowFeedback(null);
     }, 800);
-  }, [solvedLines, showFeedback, currentLineIndex, itemCount, findCorrectLeftIndex, wrongAttempts, currentTrialIndex, currentConfigNum, lineConfig.id, onTrialComplete]);
+  }, [solvedLines, showFeedback, currentLineIndex, itemCount, findCorrectLeftIndex, advanceToNext]);
 
   // Render an item (image or text)
   const renderItem = (item: LineItem, size: number = 60) => {
@@ -231,11 +244,9 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
           fontStyle = 'italic';
           break;
         case 'gothic':
-          // Gothic/Blackletter font - using Old English or similar
           fontFamily = "'Old English Text MT', 'UnifrakturMaguntia', 'Luminari', fantasy";
           break;
         case 'handwritten':
-          // Handwritten/brush font
           fontFamily = "'Comic Sans MS', 'Marker Felt', 'Bradley Hand', cursive";
           break;
         case 'normal':
@@ -260,47 +271,63 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
     }
   };
 
-  const width = 900;
-  const height = 500;
-  const leftX = 80;
-  const rightX = width - 80;
+  // Calculate dimensions
+  const width = 700;
+  const height = 400;
+  const leftMargin = 80;
+  const rightMargin = 80;
+  const lineAreaWidth = width - leftMargin - rightMargin;
   const itemSpacing = height / (itemCount + 1);
 
   return (
     <div className="flex flex-col items-center gap-4">
       <h2 className="text-white text-2xl font-bold">{lineConfig.title}</h2>
-      <p className="text-slate-400 text-sm">
-        Level {lineConfig.level} - Exercise {lineConfig.exercise}
-      </p>
+      
+      {/* Progress and difficulty indicator */}
+      <div className="flex items-center gap-4 text-slate-300">
+        <span className="text-lg">Puzzle {currentPuzzle + 1} of {PUZZLES_PER_SESSION}</span>
+        <span className="px-2 py-1 bg-slate-700 rounded text-sm">
+          Level {difficulty} • {itemCount} lines
+        </span>
+      </div>
       
       <div className="relative" style={{ width, height }}>
         {/* SVG for lines */}
-        <svg
+        <svg 
           ref={svgRef}
-          width={width}
-          height={height}
-          className="absolute inset-0"
-          style={{ background: '#f8fafc' }}
+          className="absolute inset-0" 
+          viewBox={`0 0 ${width} ${height}`}
+          style={{ overflow: 'visible' }}
         >
-          {/* Draw all connection lines */}
-          {lineConfig.connections.map((rightIndex, leftIndex) => {
-            const leftY = (leftIndex + 1) * itemSpacing;
-            const rightY = (rightIndex + 1) * itemSpacing;
+          {/* Draw lines from left to right items */}
+          {lineConfig.leftItems.map((_, leftIdx) => {
+            const rightIdx = lineConfig.connections[leftIdx];
+            const leftY = (leftIdx + 1) * itemSpacing;
+            const rightY = (rightIdx + 1) * itemSpacing;
             
-            const pathD = lineConfig.lineStyle.type === 'angular'
-              ? generateAngularPath(leftX + 40, leftY, rightX - 40, rightY, leftIndex * 1000 + rightIndex)
-              : generateCurvedPath(leftX + 40, leftY, rightX - 40, rightY, leftIndex * 1000 + rightIndex, 4);
+            const startX = leftMargin;
+            const endX = width - rightMargin;
             
-            const isSolved = solvedLines.has(leftIndex);
+            // Generate path based on line style
+            let pathD: string;
+            const seed = lineConfig.id * 100 + leftIdx * 10 + rightIdx;
+            
+            if (lineConfig.lineStyle.type === 'curved') {
+              pathD = generateCurvedPath(startX, leftY, endX, rightY, seed);
+            } else {
+              pathD = generateAngularPath(startX, leftY, endX, rightY, seed);
+            }
+            
+            const isSolved = solvedLines.has(leftIdx);
             
             return (
               <path
-                key={`line-${leftIndex}`}
+                key={`line-${leftIdx}`}
                 d={pathD}
+                fill="none"
                 stroke={isSolved ? '#22c55e' : lineConfig.lineColor}
                 strokeWidth={lineConfig.lineStyle.strokeWidth}
-                strokeDasharray={lineConfig.lineStyle.dashed ? '8,8' : 'none'}
-                fill="none"
+                strokeDasharray={lineConfig.lineStyle.dashed ? '8,4' : 'none'}
                 opacity={isSolved ? 0.5 : 1}
               />
             );
@@ -308,78 +335,57 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
         </svg>
 
         {/* Left items (clickable) */}
-        {lineConfig.leftItems.map((item, index) => {
-          const y = (index + 1) * itemSpacing;
-          const isSolved = solvedLines.has(index);
-          const hasFeedback = showFeedback?.index === index;
+        {lineConfig.leftItems.map((item, idx) => {
+          const y = (idx + 1) * itemSpacing - 30;
+          const isSolved = solvedLines.has(idx);
+          const feedback = showFeedback?.index === idx ? showFeedback : null;
           
           return (
             <button
-              key={`left-${index}`}
-              onClick={() => handleLeftClick(index)}
-              disabled={isSolved}
-              className={`
-                absolute flex items-center justify-center
-                w-16 h-16 rounded-xl transition-all duration-200
-                ${isSolved 
-                  ? 'bg-green-100 border-2 border-green-500 cursor-default' 
-                  : 'bg-white border-2 border-slate-300 hover:border-primary-500 hover:shadow-lg cursor-pointer'
-                }
-                ${hasFeedback && showFeedback.correct ? 'bg-green-200 border-green-500' : ''}
-                ${hasFeedback && !showFeedback.correct ? 'bg-red-200 border-red-500' : ''}
+              key={`left-${idx}`}
+              className={`absolute flex items-center justify-center w-16 h-16 rounded-full transition-all
+                ${isSolved ? 'bg-green-200 ring-4 ring-green-500' : 'bg-white hover:bg-blue-50'}
+                ${feedback?.correct === true ? 'ring-4 ring-green-500 bg-green-100' : ''}
+                ${feedback?.correct === false ? 'ring-4 ring-red-500 bg-red-100 animate-shake' : ''}
               `}
-              style={{
-                left: leftX - 32,
-                top: y - 32,
-              }}
+              style={{ left: 0, top: y }}
+              onClick={() => handleLeftClick(idx)}
+              disabled={isSolved || !!showFeedback}
             >
-              {renderItem(item, 48)}
+              {renderItem(item)}
               {isSolved && (
-                <span className="absolute -top-2 -right-2 text-xl">✓</span>
-              )}
-              {hasFeedback && !showFeedback.correct && (
-                <span className="absolute inset-0 flex items-center justify-center text-4xl text-red-500">✗</span>
+                <span className="absolute -top-1 -right-1 text-green-600 text-xl">✓</span>
               )}
             </button>
           );
         })}
 
-        {/* Right items (with eye indicator) */}
-        {lineConfig.rightItems.map((item, index) => {
-          const y = (index + 1) * itemSpacing;
-          const isCurrentTarget = index === currentLineIndex && !allSolved;
-          const correspondingLeftSolved = solvedLines.has(findCorrectLeftIndex(index));
+        {/* Right items with eye indicator */}
+        {lineConfig.rightItems.map((item, idx) => {
+          const y = (idx + 1) * itemSpacing - 30;
+          const isCurrentEye = idx === currentLineIndex;
+          const isSolved = solvedLines.has(findCorrectLeftIndex(idx));
           
           return (
             <div
-              key={`right-${index}`}
-              className={`
-                absolute flex items-center justify-center
-                w-16 h-16 rounded-xl transition-all duration-200
-                ${correspondingLeftSolved 
-                  ? 'bg-green-100 border-2 border-green-500' 
-                  : 'bg-white border-2 border-slate-300'
-                }
-                ${isCurrentTarget ? 'ring-4 ring-primary-400 ring-offset-2' : ''}
+              key={`right-${idx}`}
+              className={`absolute flex items-center justify-center w-16 h-16 rounded-full
+                ${isSolved ? 'bg-green-200' : 'bg-white'}
               `}
-              style={{
-                left: rightX - 32,
-                top: y - 32,
-              }}
+              style={{ right: 0, top: y }}
             >
-              {renderItem(item, 48)}
-              {isCurrentTarget && (
-                <span className="absolute -left-8 text-2xl">👁️</span>
+              {renderItem(item)}
+              {isCurrentEye && !allSolved && (
+                <span className="absolute -top-2 -left-2 text-3xl animate-pulse">👁️</span>
               )}
             </div>
           );
         })}
       </div>
 
+      {/* Status */}
       <div className="flex gap-8 text-white text-lg">
-        <span>Set: {currentConfigNum + 1} / {CONFIGS_PER_SESSION}</span>
-        <span>Solved: {solvedLines.size} / {itemCount}</span>
-        <span className="text-slate-400">Wrong attempts: {wrongAttempts}</span>
+        <span>Matched: {solvedLines.size} / {itemCount}</span>
       </div>
       
       <p className="text-slate-400 text-sm">

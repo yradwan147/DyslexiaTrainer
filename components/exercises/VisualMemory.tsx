@@ -1,51 +1,71 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import type { ExerciseProps } from '@/lib/exercises/types';
 import { 
-  MEMORY_SEQUENCES,
-  getMemorySequenceConfig,
+  generateMemorySequence,
   getItemEmoji, 
   getAllUniqueItems,
   type MemorySequence 
 } from '@/lib/exercises/visualMemoryData';
 
-// Generate a session seed for reproducible but unique puzzles
-function getSessionSeed(): number {
-  const today = new Date();
-  return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-}
-
-type Phase = 'showing' | 'input' | 'feedback' | 'complete';
-
+// 5 unique memory puzzles per session
+const PUZZLES_PER_SESSION = 5;
 const DISPLAY_TIME_MS = 10000; // 10 seconds to view all images
-const ITEMS_PER_SESSION = 5;
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 3;
+
+type Phase = 'showing' | 'input' | 'feedback';
 
 export function VisualMemory({ config, currentTrialIndex, onTrialComplete }: ExerciseProps) {
+  // Get difficulty from config (1-5)
+  const difficulty = config.difficulty_level || 1;
+  
+  // Generate a unique session seed when component mounts
+  const sessionSeed = useMemo(() => Date.now() + Math.random() * 1000000, []);
+  
+  // Pre-generate all sequences for this session - difficulty affects length and similarity
+  const sessionSequences = useMemo(() => {
+    const sequences: MemorySequence[] = [];
+    
+    for (let i = 0; i < PUZZLES_PER_SESSION; i++) {
+      // Each sequence is procedurally generated with random items
+      sequences.push(generateMemorySequence(i, sessionSeed + i * 88888, difficulty));
+    }
+    
+    return sequences;
+  }, [sessionSeed, difficulty]);
+
+  const [currentPuzzle, setCurrentPuzzle] = useState(0);
   const [phase, setPhase] = useState<Phase>('showing');
   const [userSequence, setUserSequence] = useState<string[]>([]);
-  const [currentItem, setCurrentItem] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
-  const [showCorrect, setShowCorrect] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(DISPLAY_TIME_MS / 1000);
   const [availableItems, setAvailableItems] = useState<string[]>([]);
-  const [sessionSeed] = useState(() => getSessionSeed() + currentTrialIndex * 100);
+  const [showWrongFeedback, setShowWrongFeedback] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
 
-  // Get sequence - uses procedural generation for variety
-  const currentSequence = getMemorySequenceConfig(currentItem, sessionSeed);
+  // Get current sequence configuration
+  const currentSequence = sessionSequences[currentPuzzle];
 
-  // Reset on trial/item change
+  // Reset state when moving to a new puzzle
   useEffect(() => {
-    startTimeRef.current = Date.now();
     setPhase('showing');
     setUserSequence([]);
     setTimeRemaining(DISPLAY_TIME_MS / 1000);
-    setShowCorrect(false);
-    // Generate available items for selection
+    setShowWrongFeedback(false);
     setAvailableItems(getAllUniqueItems(currentSequence));
-  }, [currentTrialIndex, currentItem, currentSequence]);
+  }, [currentPuzzle, currentSequence]);
+
+  // Reset everything when exercise restarts
+  useEffect(() => {
+    setCurrentPuzzle(0);
+    setPhase('showing');
+    setUserSequence([]);
+    setRetryCount(0);
+    setTimeRemaining(DISPLAY_TIME_MS / 1000);
+    setShowWrongFeedback(false);
+    startTimeRef.current = Date.now();
+  }, [currentTrialIndex]);
 
   // Countdown timer during showing phase
   useEffect(() => {
@@ -64,6 +84,31 @@ export function VisualMemory({ config, currentTrialIndex, onTrialComplete }: Exe
     return () => clearInterval(interval);
   }, [phase]);
 
+  // Advance to next puzzle or complete session
+  const advanceToNext = useCallback(() => {
+    const nextPuzzle = currentPuzzle + 1;
+    
+    if (nextPuzzle >= PUZZLES_PER_SESSION) {
+      // Session complete!
+      onTrialComplete({
+        trial_index: currentTrialIndex,
+        user_response: JSON.stringify({ 
+          puzzlesCompleted: PUZZLES_PER_SESSION,
+          totalRetries: retryCount
+        }),
+        response_time_ms: Date.now() - startTimeRef.current,
+        is_correct: true,
+        is_timed_out: false,
+        is_skipped: false,
+        started_at: new Date(startTimeRef.current).toISOString(),
+        responded_at: new Date().toISOString(),
+      });
+    } else {
+      // Next puzzle
+      setCurrentPuzzle(nextPuzzle);
+    }
+  }, [currentPuzzle, retryCount, currentTrialIndex, onTrialComplete]);
+
   // Handle item selection
   const handleSelect = useCallback((item: string) => {
     if (phase !== 'input') return;
@@ -76,189 +121,165 @@ export function VisualMemory({ config, currentTrialIndex, onTrialComplete }: Exe
       const isCorrect = newSequence.every((item, idx) => item === currentSequence.sequence[idx]);
       
       if (isCorrect) {
-        setShowCorrect(true);
         setPhase('feedback');
-        
-        setTimeout(() => {
-          const newItem = currentItem + 1;
-          
-          if (newItem >= ITEMS_PER_SESSION) {
-            // Session complete
-            onTrialComplete({
-              trial_index: currentTrialIndex,
-              user_response: JSON.stringify({ 
-                completed: ITEMS_PER_SESSION, 
-                retries: retryCount 
-              }),
-              response_time_ms: Date.now() - startTimeRef.current,
-              is_correct: true,
-              is_timed_out: false,
-              is_skipped: false,
-              started_at: new Date(startTimeRef.current).toISOString(),
-              responded_at: new Date().toISOString(),
-            });
-          } else {
-            // Next item
-            setCurrentItem(newItem);
-            setRetryCount(0);
-          }
-        }, 1500);
+        setTimeout(() => advanceToNext(), 1500);
       } else {
-        // Wrong - retry or move on
-        setShowCorrect(false);
-        setPhase('feedback');
+        // Wrong sequence
+        setShowWrongFeedback(true);
+        setRetryCount(prev => prev + 1);
         
         setTimeout(() => {
           if (retryCount + 1 >= MAX_RETRIES) {
-            // Max retries reached, move to next
-            const newItem = currentItem + 1;
-            
-            if (newItem >= ITEMS_PER_SESSION) {
-              onTrialComplete({
-                trial_index: currentTrialIndex,
-                user_response: JSON.stringify({ 
-                  completed: currentItem, 
-                  retries: retryCount + 1 
-                }),
-                response_time_ms: Date.now() - startTimeRef.current,
-                is_correct: false,
-                is_timed_out: false,
-                is_skipped: false,
-                started_at: new Date(startTimeRef.current).toISOString(),
-                responded_at: new Date().toISOString(),
-              });
-            } else {
-              setCurrentItem(newItem);
-              setRetryCount(0);
-            }
+            // Too many retries, move on anyway
+            advanceToNext();
           } else {
-            // Retry same sequence
-            setRetryCount(prev => prev + 1);
+            // Retry - show sequence again
             setUserSequence([]);
+            setShowWrongFeedback(false);
             setPhase('showing');
             setTimeRemaining(DISPLAY_TIME_MS / 1000);
           }
         }, 1500);
       }
     }
-  }, [phase, userSequence, currentSequence, currentItem, retryCount, currentTrialIndex, onTrialComplete]);
+  }, [phase, userSequence, currentSequence.sequence, retryCount, advanceToNext]);
 
-  // Undo last selection
-  const handleUndo = useCallback(() => {
-    if (phase === 'input' && userSequence.length > 0) {
-      setUserSequence(prev => prev.slice(0, -1));
+  // Skip to input phase
+  const handleSkipTimer = () => {
+    if (phase === 'showing') {
+      setPhase('input');
+      setTimeRemaining(0);
     }
-  }, [phase, userSequence]);
+  };
+
+  // Render the sequence display during showing phase
+  const renderSequenceDisplay = () => {
+    return (
+      <div className="flex flex-col items-center gap-6">
+        <p className="text-slate-300 text-lg">Remember this sequence:</p>
+        
+        <div className="flex gap-4 flex-wrap justify-center max-w-lg">
+          {currentSequence.sequence.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-white rounded-xl p-4 shadow-lg flex flex-col items-center"
+            >
+              <span className="text-5xl">{getItemEmoji(item)}</span>
+              <span className="text-slate-400 text-sm mt-1">{idx + 1}</span>
+            </div>
+          ))}
+        </div>
+        
+        <div className="text-white text-2xl font-bold">
+          {timeRemaining}s
+        </div>
+        
+        <button
+          onClick={handleSkipTimer}
+          className="text-slate-400 text-sm hover:text-white transition-colors"
+        >
+          I'm ready!
+        </button>
+      </div>
+    );
+  };
+
+  // Render the input phase
+  const renderInputPhase = () => {
+    return (
+      <div className="flex flex-col items-center gap-6">
+        <p className="text-slate-300 text-lg">
+          Click the items in the correct order ({userSequence.length}/{currentSequence.sequence.length})
+        </p>
+        
+        {/* User's current selection */}
+        <div className="flex gap-2 min-h-16">
+          {userSequence.map((item, idx) => (
+            <div
+              key={idx}
+              className="bg-blue-100 rounded-lg p-2 flex items-center justify-center"
+            >
+              <span className="text-3xl">{getItemEmoji(item)}</span>
+            </div>
+          ))}
+          {userSequence.length === 0 && (
+            <div className="text-slate-500">Select items below...</div>
+          )}
+        </div>
+        
+        {/* Available items grid */}
+        <div className="grid grid-cols-4 gap-3 bg-slate-100 p-4 rounded-2xl">
+          {availableItems.map((item, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleSelect(item)}
+              className="bg-white rounded-xl p-3 shadow hover:scale-110 transition-transform"
+            >
+              <span className="text-4xl">{getItemEmoji(item)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Render feedback phase
+  const renderFeedbackPhase = () => {
+    return (
+      <div className="flex flex-col items-center gap-6">
+        {showWrongFeedback ? (
+          <>
+            <div className="text-red-400 text-2xl font-bold">
+              Not quite right...
+            </div>
+            <p className="text-slate-400">
+              {retryCount < MAX_RETRIES ? 'Let\'s try again!' : 'Moving to next puzzle...'}
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="text-green-400 text-2xl font-bold animate-pulse">
+              🎉 Perfect! 🎉
+            </div>
+            <div className="flex gap-2">
+              {currentSequence.sequence.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="bg-green-100 rounded-lg p-2"
+                >
+                  <span className="text-3xl">{getItemEmoji(item)}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col items-center gap-6">
-      <h2 className="text-white text-2xl font-bold">
-        {phase === 'showing' ? 'Remember these images!' : 
-         phase === 'feedback' ? (showCorrect ? 'Correct!' : 'Try again!') :
-         'Select the images in order'}
-      </h2>
-
-      <div className="text-slate-400 text-sm flex gap-6">
-        <span>Item: {currentItem + 1} / {ITEMS_PER_SESSION}</span>
-        <span>Sequence length: {currentSequence.sequence.length}</span>
-        {retryCount > 0 && <span>Attempt: {retryCount + 1} / {MAX_RETRIES}</span>}
+      <h2 className="text-white text-2xl font-bold">Remember the Sequence!</h2>
+      
+      {/* Progress and difficulty indicator */}
+      <div className="flex items-center gap-4 text-slate-300">
+        <span className="text-lg">Puzzle {currentPuzzle + 1} of {PUZZLES_PER_SESSION}</span>
+        <span className="px-2 py-1 bg-slate-700 rounded text-sm">
+          Level {difficulty} • {currentSequence.sequence.length} items
+        </span>
       </div>
 
-      {/* Display area - show ALL images simultaneously */}
-      <div className="min-h-[180px] flex flex-col items-center justify-center gap-4">
-        {phase === 'showing' && (
-          <>
-            {/* Timer */}
-            <div className="text-slate-400 text-lg">
-              Time remaining: {timeRemaining}s
-            </div>
-            
-            {/* All images displayed in a row */}
-            <div className="flex gap-4 p-4 bg-slate-800 rounded-2xl">
-              {currentSequence.sequence.map((item, idx) => (
-                <div 
-                  key={idx} 
-                  className="flex flex-col items-center gap-2"
-                >
-                  <div className="text-6xl p-3 bg-slate-700 rounded-xl">
-                    {getItemEmoji(item)}
-                  </div>
-                  <span className="text-slate-500 text-xs">{idx + 1}</span>
-                </div>
-              ))}
-            </div>
-            
-            <p className="text-slate-400 text-sm">
-              Remember the order from left to right!
-            </p>
-          </>
-        )}
-
-        {phase === 'input' && (
-          <>
-            {/* User's current selection */}
-            <div className="flex gap-3 mb-4">
-              {userSequence.map((item, idx) => (
-                <div key={idx} className="text-5xl p-2 bg-slate-700 rounded-xl">
-                  {getItemEmoji(item)}
-                </div>
-              ))}
-              {userSequence.length < currentSequence.sequence.length && (
-                <div className="w-16 h-16 border-4 border-dashed border-slate-500 rounded-xl flex items-center justify-center text-slate-500">
-                  {userSequence.length + 1}
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
-        {phase === 'feedback' && (
-          <div className={`text-6xl ${showCorrect ? 'text-green-500' : 'text-red-500'}`}>
-            {showCorrect ? '✓' : '✗'}
-          </div>
-        )}
+      {/* Sequence info */}
+      <div className="text-slate-400 text-sm">
+        {currentSequence.sequence.length} items to remember
       </div>
 
-      {/* Selection grid */}
-      {phase === 'input' && (
-        <>
-          <div className="grid grid-cols-4 gap-3 max-w-lg">
-            {availableItems.map((item, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleSelect(item)}
-                disabled={userSequence.includes(item)}
-                className={`
-                  text-4xl p-3 rounded-xl transition-all
-                  ${userSequence.includes(item) 
-                    ? 'bg-slate-800 opacity-50 cursor-not-allowed' 
-                    : 'bg-slate-700 hover:bg-slate-600 active:scale-95 cursor-pointer'
-                  }
-                `}
-              >
-                {getItemEmoji(item)}
-              </button>
-            ))}
-          </div>
-          
-          {userSequence.length > 0 && (
-            <button
-              onClick={handleUndo}
-              className="px-6 py-3 bg-slate-600 text-white rounded-xl hover:bg-slate-500"
-            >
-              Undo
-            </button>
-          )}
-        </>
-      )}
-
-      <p className="text-slate-500 text-xs max-w-md text-center">
-        Level {currentSequence.level}: {
-          currentSequence.level === 1 ? 'Visually different items' :
-          currentSequence.level === 2 ? 'Visually similar, different categories' :
-          'Visually similar, same category'
-        }
-      </p>
+      {/* Main content based on phase */}
+      <div className="bg-slate-800 rounded-2xl p-8 min-w-[400px]">
+        {phase === 'showing' && renderSequenceDisplay()}
+        {phase === 'input' && renderInputPhase()}
+        {phase === 'feedback' && renderFeedbackPhase()}
+      </div>
     </div>
   );
 }
