@@ -9,11 +9,12 @@ const BALL_RADIUS = 15;
 const TOTAL_ROUNDS = 10;
 
 interface Ball {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  bounces: number;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  progress: number; // 0 to 1
+  speed: number;    // progress increment per frame
   active: boolean;
 }
 
@@ -39,54 +40,54 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
   const goalX = (width - GOAL_WIDTH) / 2;
   const goalY = height - GOAL_HEIGHT - 10;
 
-  // Speed based on difficulty (1-5) - more noticeable difference
+  // Speed based on difficulty (1-5) - exponential scaling for harder high levels
   const difficulty = config.difficulty_level || 1;
-  const baseSpeed = 1.5 + difficulty * 1.0; // Level 1: 2.5, Level 2: 3.5, Level 3: 4.5, Level 4: 5.5, Level 5: 6.5
+  // Speed is progress per frame - Level 5 is MUCH faster
+  // Level 1: ~4 sec, Level 2: ~2.5 sec, Level 3: ~1.5 sec, Level 4: ~1 sec, Level 5: ~0.6 sec
+  const speedLevels = [0.004, 0.007, 0.012, 0.018, 0.028];
+  const ballSpeed = speedLevels[difficulty - 1] || 0.012;
 
-  // Create a new ball - ALWAYS passes through the CENTER of the green goal area
+  // Create a new ball - uses parametric path from top to goal center
   const createBall = useCallback((): Ball => {
     // Start from random position at top
-    const startX = Math.random() * (width - 200) + 100;
-    const startY = 30 + Math.random() * 20;
+    const startX = 80 + Math.random() * (width - 160);
+    const startY = 20 + Math.random() * 30;
     
-    // Target is the EXACT CENTER of the goal, with tiny random offset
+    // End point is ALWAYS inside the goal center area
+    // Small random offset to add some variety (max ±40px from center in a 150px goal)
     const goalCenterX = goalX + GOAL_WIDTH / 2;
     const goalCenterY = goalY + GOAL_HEIGHT / 2;
-    
-    // Very small offset - max 20px from center (goal is 150px wide)
-    // This ensures ball is always clearly in the middle of the green area
-    const maxOffset = 20;
-    const targetX = goalCenterX + (Math.random() - 0.5) * maxOffset;
-    
-    // Calculate direct path to target
-    const dx = targetX - startX;
-    const dy = goalCenterY - startY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    // Normalize and scale by speed
-    const vx = (dx / distance) * baseSpeed;
-    const vy = (dy / distance) * baseSpeed;
+    const endX = goalCenterX + (Math.random() - 0.5) * 60;
+    const endY = goalCenterY;
     
     return {
-      x: startX,
-      y: startY,
-      vx,
-      vy,
-      bounces: 0,
+      startX,
+      startY,
+      endX,
+      endY,
+      progress: 0,
+      speed: ballSpeed,
       active: true,
     };
-  }, [baseSpeed, goalX, goalY, width]);
+  }, [ballSpeed, goalX, goalY, width]);
+
+  // Get current ball position based on progress
+  const getBallPosition = useCallback((ball: Ball) => {
+    const x = ball.startX + (ball.endX - ball.startX) * ball.progress;
+    const y = ball.startY + (ball.endY - ball.startY) * ball.progress;
+    return { x, y };
+  }, []);
 
   // Handle click
   const handleClick = useCallback(() => {
     const ball = ballRef.current;
     if (!ball || !ball.active || showFeedbackRef.current) return;
     
-    // Check if ball is clearly inside the goal area:
-    // - Horizontally: entire ball must be inside (looks right visually)
-    // - Vertically: ball center must be inside (since ball passes through quickly)
-    const inGoalX = ball.x - BALL_RADIUS >= goalX && ball.x + BALL_RADIUS <= goalX + GOAL_WIDTH;
-    const inGoalY = ball.y >= goalY && ball.y <= goalY + GOAL_HEIGHT;
+    const { x, y } = getBallPosition(ball);
+    
+    // Check if ball is inside the goal area
+    const inGoalX = x - BALL_RADIUS >= goalX && x + BALL_RADIUS <= goalX + GOAL_WIDTH;
+    const inGoalY = y >= goalY && y <= goalY + GOAL_HEIGHT;
     
     ball.active = false;
     
@@ -124,7 +125,7 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
         ballRef.current = createBall();
       }
     }, 800);
-  }, [goalX, goalY, currentTrialIndex, onTrialComplete, createBall, difficulty]);
+  }, [goalX, goalY, currentTrialIndex, onTrialComplete, createBall, difficulty, getBallPosition]);
 
   // Animation loop - only depends on stable values
   useEffect(() => {
@@ -191,37 +192,13 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
         ctx.stroke();
       }
 
-      // Update and draw ball
+      // Update ball progress
       if (ball && ball.active && !showFeedbackRef.current) {
-        // Update position
-        ball.x += ball.vx;
-        ball.y += ball.vy;
-
-        // Bounce off side edges - redirect towards goal center
-        if (ball.x <= BALL_RADIUS) {
-          ball.vx = Math.abs(ball.vx);
-          ball.x = BALL_RADIUS;
-        }
-        if (ball.x >= width - BALL_RADIUS) {
-          ball.vx = -Math.abs(ball.vx);
-          ball.x = width - BALL_RADIUS;
-        }
+        // Advance progress along the path
+        ball.progress += ball.speed;
         
-        // Bounce off top
-        if (ball.y <= BALL_RADIUS) {
-          ball.vy = Math.abs(ball.vy);
-          ball.y = BALL_RADIUS;
-        }
-
-        // STRONG correction to keep ball heading to goal center
-        const goalCenterX = goalX + GOAL_WIDTH / 2;
-        const distanceFromCenter = goalCenterX - ball.x;
-        
-        // Very strong correction - ball will always curve towards center
-        ball.vx += distanceFromCenter * 0.008;
-        
-        // Check if ball passed goal without click (miss)
-        if (ball.y >= goalY + GOAL_HEIGHT + BALL_RADIUS) {
+        // Check if ball has passed through goal (progress > 1.1 means past the target)
+        if (ball.progress >= 1.15) {
           ball.active = false;
           missesRef.current++;
           setDisplayMisses(missesRef.current);
@@ -256,26 +233,29 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
 
       // Draw ball
       if (ball) {
-        // Check if ball is in the goal zone (matches hit detection logic)
-        // Horizontally: entire ball inside, Vertically: center inside
-        const inGoalZone = ball.x - BALL_RADIUS >= goalX && 
-                          ball.x + BALL_RADIUS <= goalX + GOAL_WIDTH &&
-                          ball.y >= goalY && 
-                          ball.y <= goalY + GOAL_HEIGHT;
+        // Calculate current position from progress
+        const ballX = ball.startX + (ball.endX - ball.startX) * ball.progress;
+        const ballY = ball.startY + (ball.endY - ball.startY) * ball.progress;
+        
+        // Check if ball is in the goal zone
+        const inGoalZone = ballX - BALL_RADIUS >= goalX && 
+                          ballX + BALL_RADIUS <= goalX + GOAL_WIDTH &&
+                          ballY >= goalY && 
+                          ballY <= goalY + GOAL_HEIGHT;
         
         // Glow effect when in goal zone
         if (inGoalZone && ball.active) {
           ctx.fillStyle = '#22c55e';
           ctx.globalAlpha = 0.3;
           ctx.beginPath();
-          ctx.arc(ball.x, ball.y, BALL_RADIUS + 10, 0, Math.PI * 2);
+          ctx.arc(ballX, ballY, BALL_RADIUS + 10, 0, Math.PI * 2);
           ctx.fill();
           ctx.globalAlpha = 1;
         }
         
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+        ctx.arc(ballX, ballY, BALL_RADIUS, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.strokeStyle = inGoalZone && ball.active ? '#22c55e' : '#333';
@@ -285,10 +265,10 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
         // Soccer ball pattern
         ctx.fillStyle = '#333';
         ctx.beginPath();
-        ctx.arc(ball.x - 5, ball.y - 5, 4, 0, Math.PI * 2);
+        ctx.arc(ballX - 5, ballY - 5, 4, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(ball.x + 5, ball.y + 3, 4, 0, Math.PI * 2);
+        ctx.arc(ballX + 5, ballY + 3, 4, 0, Math.PI * 2);
         ctx.fill();
       }
 
