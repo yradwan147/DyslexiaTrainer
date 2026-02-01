@@ -245,7 +245,7 @@ export function getAllUniqueItems(sequence: MemorySequence): string[] {
     .filter(s => s.level === sequence.level)
     .flatMap(s => s.sequence);
   
-  const distractors = [...new Set(sameLevelItems)].filter(item => !sequence.sequence.includes(item));
+  const distractors = Array.from(new Set(sameLevelItems)).filter(item => !sequence.sequence.includes(item));
   const shuffledDistractors = distractors.sort(() => Math.random() - 0.5);
   
   // Add enough distractors to fill a 4x3 grid (12 items)

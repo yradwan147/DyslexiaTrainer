@@ -501,7 +501,7 @@ export function generateLineTrackingConfig(taskIndex: number, sessionSeed: numbe
     }));
     
     // Generate random connections (shuffle indices)
-    const connections = shuffleArray([...Array(itemCount).keys()], rng);
+    const connections = shuffleArray(Array.from({ length: itemCount }, (_, i) => i), rng);
     
     // Random line style and color
     const lineStyle: LineStyle = {
@@ -547,7 +547,7 @@ export function generateLineTrackingConfig(taskIndex: number, sessionSeed: numbe
     }));
     
     // Generate random connections
-    const connections = shuffleArray([...Array(itemCount).keys()], rng);
+    const connections = shuffleArray(Array.from({ length: itemCount }, (_, i) => i), rng);
     
     // Random line style
     const lineStyle: LineStyle = {
