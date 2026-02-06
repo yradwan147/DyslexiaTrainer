@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Feedback } from '@/components/ui/Feedback';
@@ -13,7 +13,6 @@ import { LineTracking } from './LineTracking';
 import { MazeTracking } from './MazeTracking';
 import { DynamicFootball } from './DynamicFootball';
 import { DynamicTennis } from './DynamicTennis';
-import { DynamicTwoCircles } from './DynamicTwoCircles';
 import { VisualSaccades } from './VisualSaccades';
 import { VisualMemory } from './VisualMemory';
 import { VisualDiscrimination } from './VisualDiscrimination';
@@ -34,6 +33,7 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
   const [results, setResults] = useState<TrialResult[]>([]);
   const [feedbackType, setFeedbackType] = useState<'correct' | 'incorrect' | null>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const totalTrials = config.trials.length;
   const currentTrial = config.trials[currentTrialIndex];
@@ -76,6 +76,13 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
 
   // Start exercise
   const handleStart = () => {
+    // Best-effort: enter fullscreen for all exercises on start.
+    // (May be blocked by browser gesture requirements; user can still use browser fullscreen manually.)
+    if (containerRef.current && !document.fullscreenElement) {
+      containerRef.current.requestFullscreen().catch(() => {
+        // ignore
+      });
+    }
     setPhase('running');
   };
 
@@ -113,8 +120,6 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
         return <DynamicFootball {...exerciseProps} />;
       case 'dynamic_tennis':
         return <DynamicTennis {...exerciseProps} />;
-      case 'dynamic_circles':
-        return <DynamicTwoCircles {...exerciseProps} />;
       case 'visual_saccades':
         return <VisualSaccades {...exerciseProps} />;
       case 'visual_memory':
@@ -197,7 +202,7 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
 
   // Running/Feedback phase
   return (
-    <div className="min-h-screen flex flex-col bg-slate-900">
+    <div ref={containerRef} className="min-h-screen flex flex-col bg-slate-900">
       {/* Progress bar */}
       <div className="p-4 bg-slate-800">
         <div className="max-w-2xl mx-auto flex items-center gap-4">

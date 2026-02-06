@@ -12,7 +12,6 @@ import type {
   MazeTrackingTrialConfig,
   FootballTrialConfig,
   TennisTrialConfig,
-  TwoCirclesTrialConfig,
   SaccadesTrialConfig,
   VisualMemoryTrialConfig,
   PairSearchTrialConfig,
@@ -344,71 +343,6 @@ export function generateTennisConfig(difficulty: number, trialCount: number): Ex
   };
 }
 
-// Two Circles Configuration
-export function generateTwoCirclesConfig(difficulty: number, trialCount: number): ExerciseConfig {
-  const speeds = [1, 1.5, 2, 2.5, 3];
-  const speed = speeds[difficulty - 1] || 1.5;
-  
-  const trials: TwoCirclesTrialConfig[] = [];
-  const rng = createSeededRandom(generateSeed('dynamic_circles', difficulty, 0));
-  
-  for (let i = 0; i < trialCount; i++) {
-    const duration = 12000;
-    const path1: { x: number; y: number; time: number }[] = [];
-    const path2: { x: number; y: number; time: number }[] = [];
-    const overlapTimes: number[] = [];
-    
-    let x1 = 0.2, y1 = 0.5;
-    let x2 = 0.8, y2 = 0.5;
-    let dx1 = rng.next() * 0.015 * speed;
-    let dy1 = (rng.next() - 0.5) * 0.015 * speed;
-    let dx2 = -rng.next() * 0.015 * speed;
-    let dy2 = (rng.next() - 0.5) * 0.015 * speed;
-    
-    for (let t = 0; t < duration; t += 30) {
-      x1 += dx1; y1 += dy1;
-      x2 += dx2; y2 += dy2;
-      
-      if (x1 < 0.1 || x1 > 0.9) dx1 = -dx1;
-      if (y1 < 0.1 || y1 > 0.9) dy1 = -dy1;
-      if (x2 < 0.1 || x2 > 0.9) dx2 = -dx2;
-      if (y2 < 0.1 || y2 > 0.9) dy2 = -dy2;
-      
-      path1.push({ x: x1, y: y1, time: t });
-      path2.push({ x: x2, y: y2, time: t });
-      
-      // Check overlap
-      const dist = Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
-      if (dist < 0.1) {
-        if (overlapTimes.length === 0 || t - overlapTimes[overlapTimes.length - 1] > 1000) {
-          overlapTimes.push(t);
-        }
-      }
-    }
-    
-    trials.push({
-      trial_id: i + 1,
-      seed: generateSeed('dynamic_circles', difficulty, i),
-      circle1_path: path1,
-      circle2_path: path2,
-      overlap_times: overlapTimes,
-      circle_radius: 25,
-      stimulus_duration_ms: duration,
-      response_window_ms: duration,
-      iti_ms: 1000,
-    });
-  }
-  
-  return {
-    exercise_id: 'dynamic_circles',
-    exercise_version: '1.0.0',
-    difficulty_level: difficulty,
-    name: 'Two Moving Circles',
-    description: 'Click when the two circles touch',
-    trials,
-  };
-}
-
 // Visual Saccades Configuration
 export function generateSaccadesConfig(difficulty: number, trialCount: number): ExerciseConfig {
   const durations = [1500, 1200, 1000, 800, 600];
@@ -559,8 +493,6 @@ export function getExerciseConfig(exerciseId: string, difficulty: number, trialC
       return generateFootballConfig(difficulty, trialCount);
     case 'dynamic_tennis':
       return generateTennisConfig(difficulty, trialCount);
-    case 'dynamic_circles':
-      return generateTwoCirclesConfig(difficulty, trialCount);
     case 'visual_saccades':
       return generateSaccadesConfig(difficulty, trialCount);
     case 'visual_memory':

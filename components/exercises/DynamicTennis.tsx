@@ -42,7 +42,9 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
 
   // Speed based on difficulty (1-5)
   const difficulty = config.difficulty_level || 1;
-  const baseSpeed = 2 + difficulty * 0.8; // 2.8, 3.6, 4.4, 5.2, 6.0
+  // Cap Level 5 speed to equal Level 4.
+  const cappedDifficulty = Math.min(difficulty, 4);
+  const baseSpeed = 2 + cappedDifficulty * 0.8; // 2.8, 3.6, 4.4, 5.2, 5.2
   // Paddle width decreases with difficulty
   const actualPaddleWidth = PADDLE_WIDTH - (difficulty - 1) * 10; // 100, 90, 80, 70, 60
 

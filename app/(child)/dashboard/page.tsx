@@ -56,13 +56,6 @@ const ALL_EXERCISES: Exercise[] = [
     color: 'bg-lime-500',
   },
   {
-    id: 'dynamic_circles',
-    name: 'Two Circles',
-    description: 'Track overlapping circles',
-    icon: '⭕',
-    color: 'bg-cyan-500',
-  },
-  {
     id: 'visual_saccades',
     name: 'Saccades',
     description: 'Quick eye movements',

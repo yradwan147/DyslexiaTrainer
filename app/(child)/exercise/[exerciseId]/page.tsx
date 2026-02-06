@@ -16,7 +16,6 @@ const EXERCISE_INFO: Record<string, { name: string; description: string; icon: s
   maze_tracking: { name: 'Maze Tracking', description: 'Navigate through the maze', icon: '🧩' },
   dynamic_football: { name: 'Football', description: 'Track the moving ball', icon: '⚽' },
   dynamic_tennis: { name: 'Tennis', description: 'Follow the bouncing ball', icon: '🎾' },
-  dynamic_circles: { name: 'Two Moving Circles', description: 'Track overlapping circles', icon: '⭕' },
   visual_saccades: { name: 'Visual Saccades', description: 'Quick eye movement training', icon: '👀' },
   visual_memory: { name: 'Visual Memory', description: 'Remember what you saw', icon: '🧠' },
   pair_search: { name: 'Pair Search', description: 'Find matching pairs', icon: '🃏' },
@@ -45,6 +44,18 @@ export default function ExercisePage() {
   // Start exercise
   const startExercise = useCallback(async () => {
     try {
+      const isSaccades = exerciseId === 'visual_saccades';
+
+      // Saccades: persist a per-browser 1–15 training run index
+      let saccadesTrainingRunIndex: number | undefined;
+      if (isSaccades) {
+        const completedRaw = localStorage.getItem('saccadesTrainingRun');
+        const completed = Math.max(0, Number.parseInt(completedRaw || '0', 10) || 0);
+        saccadesTrainingRunIndex = Math.min(15, completed + 1);
+      }
+
+      const trialCount = isSaccades ? 1 : 10;
+
       // Create exercise run record
       const res = await fetch('/api/exercise-runs', {
         method: 'POST',
@@ -53,7 +64,7 @@ export default function ExercisePage() {
           exercise_id: exerciseId,
           exercise_version: '1.0.0',
           difficulty_level: difficulty,
-          total_trials: 10,
+          total_trials: trialCount,
         }),
       });
 
@@ -61,7 +72,10 @@ export default function ExercisePage() {
       setExerciseRunId(data.exerciseRun.id);
 
       // Generate exercise config
-      const config = getExerciseConfig(exerciseId, difficulty, 10);
+      const config = getExerciseConfig(exerciseId, difficulty, trialCount);
+      if (isSaccades && saccadesTrainingRunIndex) {
+        config.training_run_index = saccadesTrainingRunIndex;
+      }
       setCurrentConfig(config);
       setPhase('exercise');
     } catch (error) {
@@ -92,7 +106,14 @@ export default function ExercisePage() {
 
     setResults({ correct: correctCount, total: trialResults.length });
     setPhase('complete');
-  }, [exerciseRunId]);
+
+    // After completion, advance the Saccades training run counter (up to 15).
+    if (exerciseId === 'visual_saccades') {
+      const completedRaw = localStorage.getItem('saccadesTrainingRun');
+      const completed = Math.max(0, Number.parseInt(completedRaw || '0', 10) || 0);
+      localStorage.setItem('saccadesTrainingRun', String(Math.min(15, completed + 1)));
+    }
+  }, [exerciseRunId, exerciseId]);
 
   // Handle exit
   const handleExit = () => {
@@ -145,7 +166,7 @@ export default function ExercisePage() {
           </div>
 
           <p className="text-slate-500 mb-8">
-            10 trials • Take your time!
+            {exerciseId === 'visual_saccades' ? '1 training run • Take your time!' : '10 trials • Take your time!'}
           </p>
           
           <div className="flex flex-col gap-4">

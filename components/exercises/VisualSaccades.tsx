@@ -6,12 +6,12 @@ import type { ExerciseProps } from '@/lib/exercises/types';
 const MOVEMENTS_PER_TRIAL = 10;
 const TRIALS_PER_SESSION = 5;
 
-// Circle radius scales with difficulty (1-5)
-// Level 1: 60px (largest, easiest)
-// Level 5: 20px (smallest, hardest)
-function getCircleRadius(difficulty: number): number {
-  // Linear scale: 60px at level 1, 20px at level 5
-  return 60 - (difficulty - 1) * 10; // 60, 50, 40, 30, 20
+// Circle radius scales with a 1–15 training run index:
+// Runs 1–5: large, 6–10: medium, 11–15: small.
+function getCircleRadius(trainingRunIndex: number): number {
+  if (trainingRunIndex <= 5) return 60; // 120px diameter
+  if (trainingRunIndex <= 10) return 40; // 80px diameter
+  return 20; // 40px diameter
 }
 
 export function VisualSaccades({ config, currentTrialIndex, onTrialComplete }: ExerciseProps) {
@@ -27,7 +27,8 @@ export function VisualSaccades({ config, currentTrialIndex, onTrialComplete }: E
   const [trialTimes, setTrialTimes] = useState<number[]>([]);
 
   const level = config.difficulty_level || 1;
-  const circleRadius = getCircleRadius(level);
+  const trainingRunIndex = config.training_run_index ?? level;
+  const circleRadius = getCircleRadius(trainingRunIndex);
   const width = 800;
   const height = 500;
 
@@ -88,6 +89,7 @@ export function VisualSaccades({ config, currentTrialIndex, onTrialComplete }: E
               totalHits: totalHits + 1,
               trialTimes: newTrialTimes,
               level,
+              trainingRunIndex,
               circleSize: circleRadius * 2 
             }),
             response_time_ms: Date.now() - startTimeRef.current,
@@ -111,7 +113,7 @@ export function VisualSaccades({ config, currentTrialIndex, onTrialComplete }: E
         setCirclePos(generateRandomPosition());
       }
     }
-  }, [circlePos, circleRadius, currentMovement, currentTrial, totalHits, trialTimes, level, currentTrialIndex, onTrialComplete, generateRandomPosition, width, height]);
+  }, [circlePos, circleRadius, currentMovement, currentTrial, totalHits, trialTimes, level, trainingRunIndex, currentTrialIndex, onTrialComplete, generateRandomPosition, width, height]);
 
   // Handle mouse move for hover effect
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -177,6 +179,7 @@ export function VisualSaccades({ config, currentTrialIndex, onTrialComplete }: E
 
   // Calculate size label
   const getSizeLabel = (difficulty: number) => {
+    // Keep label stable even if caller passes a training run index.
     const radius = getCircleRadius(difficulty);
     return `${radius * 2}px circle`;
   };
@@ -188,7 +191,7 @@ export function VisualSaccades({ config, currentTrialIndex, onTrialComplete }: E
       <div className="text-slate-400 text-sm flex gap-6">
         <span>Trial: {currentTrial + 1} / {TRIALS_PER_SESSION}</span>
         <span>Movement: {currentMovement + 1} / {MOVEMENTS_PER_TRIAL}</span>
-        <span>Level: {level} ({getSizeLabel(level)})</span>
+        <span>Level: {level} ({getSizeLabel(trainingRunIndex)})</span>
       </div>
       
       <canvas

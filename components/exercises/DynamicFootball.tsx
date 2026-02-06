@@ -5,6 +5,7 @@ import type { ExerciseProps } from '@/lib/exercises/types';
 
 const GOAL_WIDTH = 150;
 const GOAL_HEIGHT = 60;
+const GOAL_POST_EXTENSION = 30; // visible post height above crossbar
 const BALL_RADIUS = 15;
 const TOTAL_ROUNDS = 10;
 
@@ -42,9 +43,9 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
 
   // Speed based on difficulty (1-5) - exponential scaling for harder high levels
   const difficulty = config.difficulty_level || 1;
-  // Speed is progress per frame - Level 5 is MUCH faster
-  // Level 1: ~4 sec, Level 2: ~2.5 sec, Level 3: ~1.5 sec, Level 4: ~1 sec, Level 5: ~0.6 sec
-  const speedLevels = [0.004, 0.007, 0.012, 0.018, 0.028];
+  // Speed is progress per frame. Cap Level 5 to equal Level 4.
+  // Level 1: ~4 sec, Level 2: ~2.5 sec, Level 3: ~1.5 sec, Level 4: ~1 sec, Level 5: ~1 sec
+  const speedLevels = [0.004, 0.007, 0.012, 0.018, 0.018];
   const ballSpeed = speedLevels[difficulty - 1] || 0.012;
 
   // Create a new ball - uses parametric path from top to goal center
@@ -85,9 +86,14 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
     
     const { x, y } = getBallPosition(ball);
     
-    // Check if ball is inside the goal area
-    const inGoalX = x - BALL_RADIUS >= goalX && x + BALL_RADIUS <= goalX + GOAL_WIDTH;
-    const inGoalY = y >= goalY && y <= goalY + GOAL_HEIGHT;
+    // Check if ball is inside the full (visible) goal area, including posts/crossbar region.
+    const goalHitboxX = goalX - 5;
+    const goalHitboxY = goalY - GOAL_POST_EXTENSION;
+    const goalHitboxW = GOAL_WIDTH + 10;
+    const goalHitboxH = GOAL_HEIGHT + GOAL_POST_EXTENSION;
+
+    const inGoalX = x >= goalHitboxX && x <= goalHitboxX + goalHitboxW;
+    const inGoalY = y >= goalHitboxY && y <= goalHitboxY + goalHitboxH;
     
     ball.active = false;
     
@@ -168,13 +174,14 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
 
       // Draw goal at bottom center
       ctx.fillStyle = '#22c55e';
-      ctx.fillRect(goalX, goalY, GOAL_WIDTH, GOAL_HEIGHT);
+      // Full goal area (match hitbox)
+      ctx.fillRect(goalX - 5, goalY - GOAL_POST_EXTENSION, GOAL_WIDTH + 10, GOAL_HEIGHT + GOAL_POST_EXTENSION);
       
       // Goal posts
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(goalX - 5, goalY - 30, 10, GOAL_HEIGHT + 30);
-      ctx.fillRect(goalX + GOAL_WIDTH - 5, goalY - 30, 10, GOAL_HEIGHT + 30);
-      ctx.fillRect(goalX - 5, goalY - 30, GOAL_WIDTH + 10, 8);
+      ctx.fillRect(goalX - 5, goalY - GOAL_POST_EXTENSION, 10, GOAL_HEIGHT + GOAL_POST_EXTENSION);
+      ctx.fillRect(goalX + GOAL_WIDTH - 5, goalY - GOAL_POST_EXTENSION, 10, GOAL_HEIGHT + GOAL_POST_EXTENSION);
+      ctx.fillRect(goalX - 5, goalY - GOAL_POST_EXTENSION, GOAL_WIDTH + 10, 8);
       
       // Goal net pattern
       ctx.strokeStyle = '#ffffff40';
@@ -237,11 +244,17 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
         const ballX = ball.startX + (ball.endX - ball.startX) * ball.progress;
         const ballY = ball.startY + (ball.endY - ball.startY) * ball.progress;
         
-        // Check if ball is in the goal zone
-        const inGoalZone = ballX - BALL_RADIUS >= goalX && 
-                          ballX + BALL_RADIUS <= goalX + GOAL_WIDTH &&
-                          ballY >= goalY && 
-                          ballY <= goalY + GOAL_HEIGHT;
+        // Check if ball is in the full visible goal zone (match hitbox)
+        const goalHitboxX = goalX - 5;
+        const goalHitboxY = goalY - GOAL_POST_EXTENSION;
+        const goalHitboxW = GOAL_WIDTH + 10;
+        const goalHitboxH = GOAL_HEIGHT + GOAL_POST_EXTENSION;
+
+        const inGoalZone =
+          ballX >= goalHitboxX &&
+          ballX <= goalHitboxX + goalHitboxW &&
+          ballY >= goalHitboxY &&
+          ballY <= goalHitboxY + goalHitboxH;
         
         // Glow effect when in goal zone
         if (inGoalZone && ball.active) {

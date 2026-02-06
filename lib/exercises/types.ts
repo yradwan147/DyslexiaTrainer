@@ -4,6 +4,7 @@ export interface ExerciseConfig {
   exercise_id: string;
   exercise_version: string;
   difficulty_level: number;
+  training_run_index?: number;
   name: string;
   description: string;
   trials: TrialConfig[];
@@ -68,14 +69,6 @@ export interface TennisTrialConfig extends TrialConfig {
   paddle_height: number;
 }
 
-// Dynamic Tracking (Two Circles) specific
-export interface TwoCirclesTrialConfig extends TrialConfig {
-  circle1_path: { x: number; y: number; time: number }[];
-  circle2_path: { x: number; y: number; time: number }[];
-  overlap_times: number[];
-  circle_radius: number;
-}
-
 // Visual Discrimination specific
 export interface VisualDiscriminationTrialConfig extends TrialConfig {
   target_shape_id: number;
@@ -133,7 +126,6 @@ export type ExerciseId =
   | 'visual_memory'
   | 'dynamic_football'
   | 'dynamic_tennis'
-  | 'dynamic_circles'
   | 'visual_saccades'
   | 'visual_search'
   | 'pair_search';
@@ -146,7 +138,6 @@ export const EXERCISE_NAMES: Record<ExerciseId, string> = {
   visual_memory: 'Visual Memory',
   dynamic_football: 'Dynamic Eye Tracking - Football',
   dynamic_tennis: 'Dynamic Eye Tracking - Tennis',
-  dynamic_circles: 'Dynamic Eye Tracking - Two Circles',
   visual_saccades: 'Saccades',
   visual_search: 'Visual Search',
   pair_search: 'Pair Search (Legacy)',

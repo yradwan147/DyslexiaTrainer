@@ -80,10 +80,9 @@ function seedDemoData(): void {
         { id: 'maze_tracking', version: '1.0.0', difficulty: 1, trials: 3, order: 4 },
         { id: 'dynamic_football', version: '1.0.0', difficulty: 1, trials: 10, order: 5 },
         { id: 'dynamic_tennis', version: '1.0.0', difficulty: 1, trials: 10, order: 6 },
-        { id: 'dynamic_circles', version: '1.0.0', difficulty: 1, trials: 10, order: 7 },
-        { id: 'visual_saccades', version: '1.0.0', difficulty: 1, trials: 20, order: 8 },
-        { id: 'visual_memory', version: '1.0.0', difficulty: 1, trials: 10, order: 9 },
-        { id: 'pair_search', version: '1.0.0', difficulty: 1, trials: 1, order: 10 },
+        { id: 'visual_saccades', version: '1.0.0', difficulty: 1, trials: 20, order: 7 },
+        { id: 'visual_memory', version: '1.0.0', difficulty: 1, trials: 10, order: 8 },
+        { id: 'pair_search', version: '1.0.0', difficulty: 1, trials: 1, order: 9 },
       ];
       
       const insertExercise = db.prepare(`

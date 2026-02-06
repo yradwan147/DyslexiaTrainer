@@ -14,7 +14,11 @@ function generateCurvedPath(
   endX: number,
   endY: number,
   seed: number,
-  complexity: number = 3
+  complexity: number,
+  maxYOffset: number,
+  minY: number,
+  maxY: number,
+  laneOffset: number
 ): string {
   const seededRandom = (n: number) => {
     const x = Math.sin(seed + n) * 10000;
@@ -33,8 +37,9 @@ function generateCurvedPath(
     const t = i / (complexity + 1);
     const x = startX + t * width;
     // Add vertical variation based on seed
-    const yOffset = (seededRandom(i * 100) - 0.5) * 150;
-    const y = startY + (endY - startY) * t + yOffset;
+    const yOffset = (seededRandom(i * 100) - 0.5) * maxYOffset + laneOffset * (0.35 + 0.3 * seededRandom(i * 17));
+    const unclampedY = startY + (endY - startY) * t + yOffset;
+    const y = Math.max(minY, Math.min(maxY, unclampedY));
     points.push([x, y]);
   }
   
@@ -57,6 +62,46 @@ function generateCurvedPath(
   }
   
   return path;
+}
+
+// Generate a true wavy path (sinusoidal) between two points.
+function generateWavyPath(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+  seed: number,
+  amplitude: number,
+  minY: number,
+  maxY: number,
+  laneOffset: number
+): string {
+  const seededRandom = (n: number) => {
+    const x = Math.sin(seed + n) * 10000;
+    return x - Math.floor(x);
+  };
+
+  const width = endX - startX;
+  const steps = 14; // more steps => smoother/clearer waves
+  const baseFreq = 2.5 + seededRandom(1) * 1.5; // 2.5–4.0 waves across width
+  const phase = seededRandom(2) * Math.PI * 2;
+
+  let d = `M ${startX} ${startY}`;
+
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const x = startX + t * width;
+    const lerpY = startY + (endY - startY) * t;
+    const wave = Math.sin(t * Math.PI * 2 * baseFreq + phase) * amplitude;
+    const jitter = (seededRandom(i * 11) - 0.5) * (amplitude * 0.15);
+    const unclampedY = lerpY + wave + jitter + laneOffset * 0.35;
+    const y = Math.max(minY, Math.min(maxY, unclampedY));
+    d += ` L ${x} ${y}`;
+  }
+
+  // Ensure exact end point.
+  d += ` L ${endX} ${endY}`;
+  return d;
 }
 
 // Generate angular path between two points
@@ -123,6 +168,8 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
   const [showFeedback, setShowFeedback] = useState<{ index: number; correct: boolean } | null>(null);
   const startTimeRef = useRef<number>(Date.now());
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ width: number; height: number }>({ width: 900, height: 520 });
 
   // Get current puzzle configuration
   const lineConfig = sessionPuzzles[currentPuzzle];
@@ -272,12 +319,29 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
   };
 
   // Calculate dimensions
-  const width = 700;
-  const height = 400;
-  const leftMargin = 80;
-  const rightMargin = 80;
+  // Responsive sizing (plays nicely with fullscreen)
+  useEffect(() => {
+    const update = () => {
+      const w = containerRef.current?.clientWidth ?? 900;
+      const h = containerRef.current?.clientHeight ?? 520;
+      setSize({
+        width: Math.max(820, Math.min(1400, w)),
+        height: Math.max(480, Math.min(820, h)),
+      });
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const width = size.width;
+  const height = size.height;
+  const leftMargin = Math.round(width * 0.12);
+  const rightMargin = Math.round(width * 0.12);
   const lineAreaWidth = width - leftMargin - rightMargin;
+  // More vertical separation like the reference images
   const itemSpacing = height / (itemCount + 1);
+  const yPadding = Math.max(36, Math.round(itemSpacing * 0.45));
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -291,7 +355,7 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
         </span>
       </div>
       
-      <div className="relative" style={{ width, height }}>
+      <div ref={containerRef} className="relative w-full" style={{ maxWidth: width, height }}>
         {/* SVG for lines */}
         <svg 
           ref={svgRef}
@@ -311,9 +375,18 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
             // Generate path based on line style
             let pathD: string;
             const seed = lineConfig.id * 100 + leftIdx * 10 + rightIdx;
+            const laneOffset = (leftIdx - (itemCount - 1) / 2) * Math.min(14, itemSpacing * 0.25);
+            const minY = yPadding;
+            const maxY = height - yPadding;
             
             if (lineConfig.lineStyle.type === 'curved') {
-              pathD = generateCurvedPath(startX, leftY, endX, rightY, seed);
+              // Constrain offsets so lines stay distinguishable even when intertwined.
+              const complexity = 3;
+              const maxYOffset = Math.min(90, itemSpacing * 0.8);
+              pathD = generateCurvedPath(startX, leftY, endX, rightY, seed, complexity, maxYOffset, minY, maxY, laneOffset);
+            } else if (lineConfig.lineStyle.type === 'wavy') {
+              const amplitude = Math.min(55, itemSpacing * 0.55);
+              pathD = generateWavyPath(startX, leftY, endX, rightY, seed, amplitude, minY, maxY, laneOffset);
             } else {
               pathD = generateAngularPath(startX, leftY, endX, rightY, seed);
             }
@@ -329,6 +402,8 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
                 strokeWidth={lineConfig.lineStyle.strokeWidth}
                 strokeDasharray={lineConfig.lineStyle.dashed ? '8,4' : 'none'}
                 opacity={isSolved ? 0.5 : 1}
+                strokeLinejoin="round"
+                strokeLinecap="round"
               />
             );
           })}

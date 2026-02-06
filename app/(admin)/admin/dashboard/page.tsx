@@ -75,7 +75,6 @@ export default function AdminDashboard() {
       maze_tracking: 'Maze Tracking',
       dynamic_football: 'Football',
       dynamic_tennis: 'Tennis',
-      dynamic_circles: 'Two Circles',
       visual_saccades: 'Saccades',
       visual_memory: 'Visual Memory',
       pair_search: 'Pair Search',

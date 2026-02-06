@@ -17,7 +17,7 @@ interface Dot {
 const DOTS_PER_FIELD = 300;
 const DOT_LIFETIME_MS = 225; // Dots regenerate after 225ms
 const DOT_SPEED = 3; // Pixels per frame (approximating 7 deg/s)
-const STIMULUS_DURATION_MS = 3000; // 3 seconds per stimulus
+const STIMULUS_DURATION_MS = 25000; // 25 seconds per stimulus
 const INITIAL_COHERENCE = 30; // Start at 30%
 const COHERENCE_STEP = 1; // Adjust by 1%
 
@@ -31,6 +31,10 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
   const [showFeedback, setShowFeedback] = useState<boolean | null>(null);
   const [trialCount, setTrialCount] = useState(0);
   const [currentCoherence, setCurrentCoherence] = useState(INITIAL_COHERENCE);
+  const [canvasSize, setCanvasSize] = useState<{ width: number; height: number }>({
+    width: 900,
+    height: 500,
+  });
 
   const trial = config.trials[currentTrialIndex] as CoherentMotionTrialConfig;
   const { seed, coherent_side, motion_direction } = trial;
@@ -62,6 +66,24 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
+
+  // Keep canvas sizing SSR/hydration-safe (no window usage in render)
+  useEffect(() => {
+    const updateSize = () => {
+      if (!isFullscreen) {
+        setCanvasSize({ width: 900, height: 500 });
+        return;
+      }
+      // Leave some padding for header/buttons/instructions in fullscreen.
+      const width = Math.max(600, window.innerWidth - 100);
+      const height = Math.max(400, window.innerHeight - 200);
+      setCanvasSize({ width, height });
+    };
+
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, [isFullscreen]);
 
   // Handle response
   const handleResponse = useCallback((side: 'left' | 'right') => {
@@ -110,6 +132,14 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
 
     setHasResponded(false);
     startTimeRef.current = Date.now();
+
+    // Best-effort: auto-enter fullscreen when a trial starts.
+    // (May be blocked by browser gesture requirements; failure is non-fatal.)
+    if (containerRef.current && !document.fullscreenElement) {
+      containerRef.current.requestFullscreen().catch(() => {
+        // ignore
+      });
+    }
 
     const width = canvas.width;
     const height = canvas.height;
@@ -261,8 +291,8 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
       <div className="relative">
         <canvas
           ref={canvasRef}
-          width={isFullscreen ? window.innerWidth - 100 : 900}
-          height={isFullscreen ? window.innerHeight - 200 : 500}
+          width={canvasSize.width}
+          height={canvasSize.height}
           className="rounded-lg"
         />
         
