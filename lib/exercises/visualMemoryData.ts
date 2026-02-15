@@ -1,382 +1,235 @@
-// Visual Memory Exercise Data - 75 combinations organized by level
-// Based on EXACT reference images from Visual memory folder
-// Each combination defines the sequence of images to remember
+// Visual Memory Exercise Data
+// 75 predefined sequences organized into 15 training sessions (5 sequences each)
+// Uses actual PNG images from /assets/visual-memory/
+// Structure: 3-picture sessions 1-3, 4-picture sessions 4-6, 5-picture sessions 7-9,
+//            6-picture sessions 10-12, 7-picture sessions 13-15
 
 export interface MemorySequence {
   id: number;
-  level: number; // 1 = visually different, 2 = visually similar/categorically different, 3 = visually similar
-  itemCount: number; // 3, 4, 5, 6, or 7 images
-  sequence: string[]; // Array of image identifiers
+  itemCount: number;
+  sequence: string[]; // PNG filenames without extension
 }
 
-// Using emojis that match the reference images exactly
-export const MEMORY_ITEMS: Record<string, string> = {
-  // Animals
-  cat: '🐱',           // Gray sitting cat
-  dog: '🐕',           // Golden/yellow dog
-  fish: '🐟',          // Blue fish
-  crab: '🦀',          // Orange/red crab
-  snail: '🐌',         // Yellow/brown snail
-  lion: '🦁',          // Orange roaring lion
-  giraffe: '🦒',       // Giraffe
-  turtle: '🐢',        // Green sea turtle
-  frog: '🐸',          // Green frog
-  lizard: '🦎',        // Green alligator/crocodile
-  tiger: '🐯',         // Orange tiger
-  caterpillar: '🐛',   // Green caterpillar
-  butterfly: '🦋',     // Blue butterfly
-  
-  // Fruits
-  apple: '🍎',         // Red apple
-  greenapple: '🍏',    // Green apple
-  pear: '🍐',          // Green/yellow pear
-  orange: '🍊',        // Orange fruit
-  strawberry: '🍓',    // Strawberry
-  cherry: '🍒',        // Cherries
-  watermelon: '🍉',    // Watermelon slice
-  banana: '🍌',        // Banana
-  lemon: '🍋',         // Lemon
-  pineapple: '🍍',     // Pineapple
-  grapes: '🍇',        // Grapes
-  kiwi: '🥝',          // Kiwi
-  
-  // Vegetables
-  carrot: '🥕',        // Orange carrot
-  cucumber: '🥒',      // Cucumber
-  broccoli: '🥦',      // Broccoli
-  lettuce: '🥬',       // Lettuce/cabbage
-  corn: '🌽',          // Corn
-  
-  // Vehicles
-  car: '🚗',           // Blue car
-  bicycle: '🚲',       // Bicycle
-  scooter: '🛴',       // Kick scooter
-  airplane: '✈️',      // Airplane
-  ship: '🚢',          // Cruise ship/boat
-  bus: '🚌',           // Blue bus
-  train: '🚂',         // Red train
-  
-  // Nature
-  tree: '🌳',          // Green tree
-  sun: '☀️',           // Sun with rays (sunglasses in image)
-  moon: '🌙',          // Gray crescent moon with stars
-  flower: '🌸',        // Flower (pink/orange)
-  cactus: '🌵',        // Green cactus
-  leaf: '🍃',          // Green leaf
-  palm: '🌴',          // Palm tree
-  grass: '🌿',         // Grass/herbs
-  bush: '🌲',          // Bush/tree
-  rainbow: '🌈',       // Rainbow
-  cloud: '☁️',         // White cloud
-  
-  // Objects
-  chair: '🪑',         // Wooden chair
-  house: '🏠',         // House with red roof
-  ball: '🏀',          // Basketball (orange)
-  balloon: '🎈',       // Balloon (various colors)
-  pencil: '✏️',        // Yellow pencil
-  ring: '💍',          // Gold ring
-  racket: '🏸',        // Badminton/tennis racket
-  umbrella: '☂️',      // Rainbow umbrella
-  frisbee: '🥏',       // Flying disc
-  candy: '🍬',         // Wrapped candy
-  cheese: '🧀',        // Cheese wedge
-  cup: '☕',           // Cup/mug
-  sneakers: '👟',      // Sneakers/shoes
-  tennisball: '🎾',    // Tennis ball (yellow-green)
-};
-
-export function getItemEmoji(name: string): string {
-  return MEMORY_ITEMS[name] || '❓';
+export interface MemorySession {
+  sessionNumber: number; // 1-15
+  itemCount: number; // 3, 4, 5, 6, or 7
+  level: number; // 1, 2, or 3 within each item-count group
+  sequences: MemorySequence[];
 }
 
-// All 75 combinations based on the reference document
-// Structure: 5 exercises per level per item count
-// Level 1: Visually different, categorically different
-// Level 2: Visually similar, categorically different  
-// Level 3: Visually similar, categorically similar
+// Helper: strip .png and replace orange_balloon with yellow_balloon
+function img(name: string): string {
+  const base = name.replace(/\.png$/, '');
+  return base === 'orange_balloon' ? 'yellow_balloon' : base;
+}
 
-export const MEMORY_SEQUENCES: MemorySequence[] = [
-  // ============================================
-  // 3 IMAGES
-  // ============================================
-  
-  // 3 images - LEVEL 1 (exercises 1-5)
-  { id: 1, level: 1, itemCount: 3, sequence: ['cat', 'apple', 'car'] },
-  { id: 2, level: 1, itemCount: 3, sequence: ['fish', 'tree', 'crab'] },
-  { id: 3, level: 1, itemCount: 3, sequence: ['sun', 'pear', 'dog'] },
-  { id: 4, level: 1, itemCount: 3, sequence: ['snail', 'balloon', 'chair'] },
-  { id: 5, level: 1, itemCount: 3, sequence: ['house', 'ball', 'moon'] },
-  
-  // 3 images - LEVEL 2 (exercises 6-10)
-  { id: 6, level: 2, itemCount: 3, sequence: ['snail', 'lion', 'pencil'] },
-  { id: 7, level: 2, itemCount: 3, sequence: ['pear', 'chair', 'tree'] },
-  { id: 8, level: 2, itemCount: 3, sequence: ['sun', 'balloon', 'ring'] },
-  { id: 9, level: 2, itemCount: 3, sequence: ['crab', 'apple', 'bicycle'] },
-  { id: 10, level: 2, itemCount: 3, sequence: ['fish', 'car', 'cat'] },
-  
-  // 3 images - LEVEL 3 (exercises 11-15)
-  { id: 11, level: 3, itemCount: 3, sequence: ['cat', 'lion', 'giraffe'] },
-  { id: 12, level: 3, itemCount: 3, sequence: ['turtle', 'frog', 'lizard'] },
-  { id: 13, level: 3, itemCount: 3, sequence: ['ball', 'balloon', 'racket'] },
-  { id: 14, level: 3, itemCount: 3, sequence: ['bicycle', 'car', 'scooter'] },
-  { id: 15, level: 3, itemCount: 3, sequence: ['cactus', 'tree', 'leaf'] },
+// All 75 sequences from config_images.txt, organized into 15 sessions of 5
+export const MEMORY_SESSIONS: MemorySession[] = [
+  // --- 3 pictures ---
+  // Session 1: Level 1 (exercises 1-5)
+  {
+    sessionNumber: 1, itemCount: 3, level: 1,
+    sequences: [
+      { id: 1, itemCount: 3, sequence: [img('gray_cat'), img('red_apple'), img('blue_car')] },
+      { id: 2, itemCount: 3, sequence: [img('blue_fish'), img('tree'), img('crab')] },
+      { id: 3, itemCount: 3, sequence: [img('sun_sunglasses'), img('pear'), img('dog')] },
+      { id: 4, itemCount: 3, sequence: [img('snail'), img('green_balloon'), img('chair')] },
+      { id: 5, itemCount: 3, sequence: [img('house'), img('basketball'), img('gray_moon')] },
+    ],
+  },
+  // Session 2: Level 2 (exercises 6-10)
+  {
+    sessionNumber: 2, itemCount: 3, level: 2,
+    sequences: [
+      { id: 6, itemCount: 3, sequence: [img('snail'), img('lion'), img('pencil')] },
+      { id: 7, itemCount: 3, sequence: [img('pear'), img('chair'), img('tree')] },
+      { id: 8, itemCount: 3, sequence: [img('sun_sunglasses'), img('yellow_balloon'), img('ring')] },
+      { id: 9, itemCount: 3, sequence: [img('crab'), img('red_apple'), img('red_bicycle')] },
+      { id: 10, itemCount: 3, sequence: [img('blue_fish'), img('blue_car'), img('blue_cat')] },
+    ],
+  },
+  // Session 3: Level 3 (exercises 11-15)
+  {
+    sessionNumber: 3, itemCount: 3, level: 3,
+    sequences: [
+      { id: 11, itemCount: 3, sequence: [img('orange_cat'), img('lion'), img('giraffe')] },
+      { id: 12, itemCount: 3, sequence: [img('turtle'), img('frog'), img('lizard')] },
+      { id: 13, itemCount: 3, sequence: [img('basketball'), img('orange_balloon'), img('racket')] },
+      { id: 14, itemCount: 3, sequence: [img('blue_bicycle'), img('blue_car'), img('blue_scooter')] },
+      { id: 15, itemCount: 3, sequence: [img('cactus'), img('tree'), img('leaf')] },
+    ],
+  },
 
-  // ============================================
-  // 4 IMAGES
-  // ============================================
-  
-  // 4 images - LEVEL 1 (exercises 16-20)
-  { id: 16, level: 1, itemCount: 4, sequence: ['pencil', 'car', 'ring', 'tree'] },
-  { id: 17, level: 1, itemCount: 4, sequence: ['cat', 'house', 'sun', 'fish'] },
-  { id: 18, level: 1, itemCount: 4, sequence: ['car', 'crab', 'balloon', 'dog'] },
-  { id: 19, level: 1, itemCount: 4, sequence: ['snail', 'apple', 'chair', 'balloon'] },
-  { id: 20, level: 1, itemCount: 4, sequence: ['moon', 'house', 'dog', 'fish'] },
-  
-  // 4 images - LEVEL 2 (exercises 21-25)
-  { id: 21, level: 2, itemCount: 4, sequence: ['snail', 'lion', 'pencil', 'giraffe'] },
-  { id: 22, level: 2, itemCount: 4, sequence: ['pear', 'chair', 'tree', 'greenapple'] },
-  { id: 23, level: 2, itemCount: 4, sequence: ['sun', 'balloon', 'ring', 'ball'] },
-  { id: 24, level: 2, itemCount: 4, sequence: ['moon', 'car', 'cat', 'fish'] },
-  { id: 25, level: 2, itemCount: 4, sequence: ['apple', 'crab', 'ball', 'balloon'] },
-  
-  // 4 images - LEVEL 3 (exercises 26-30)
-  { id: 26, level: 3, itemCount: 4, sequence: ['cat', 'tiger', 'lion', 'giraffe'] },
-  { id: 27, level: 3, itemCount: 4, sequence: ['caterpillar', 'frog', 'turtle', 'lizard'] },
-  { id: 28, level: 3, itemCount: 4, sequence: ['ball', 'balloon', 'racket', 'frisbee'] },
-  { id: 29, level: 3, itemCount: 4, sequence: ['bicycle', 'airplane', 'ship', 'car'] },
-  { id: 30, level: 3, itemCount: 4, sequence: ['cactus', 'leaf', 'flower', 'tree'] },
+  // --- 4 pictures ---
+  // Session 4: Level 1 (exercises 16-20)
+  {
+    sessionNumber: 4, itemCount: 4, level: 1,
+    sequences: [
+      { id: 16, itemCount: 4, sequence: [img('pencil'), img('blue_car'), img('ring'), img('tree')] },
+      { id: 17, itemCount: 4, sequence: [img('gray_cat'), img('house'), img('sun_sunglasses'), img('blue_fish')] },
+      { id: 18, itemCount: 4, sequence: [img('blue_car'), img('crab'), img('green_balloon'), img('dog')] },
+      { id: 19, itemCount: 4, sequence: [img('snail'), img('red_apple'), img('chair'), img('green_balloon')] },
+      { id: 20, itemCount: 4, sequence: [img('gray_moon'), img('house'), img('dog'), img('blue_fish')] },
+    ],
+  },
+  // Session 5: Level 2 (exercises 21-25)
+  {
+    sessionNumber: 5, itemCount: 4, level: 2,
+    sequences: [
+      { id: 21, itemCount: 4, sequence: [img('snail'), img('lion'), img('pencil'), img('giraffe')] },
+      { id: 22, itemCount: 4, sequence: [img('pear'), img('chair'), img('tree'), img('green_apple')] },
+      { id: 23, itemCount: 4, sequence: [img('sun_sunglasses'), img('yellow_balloon'), img('ring'), img('basketball')] },
+      { id: 24, itemCount: 4, sequence: [img('gray_moon'), img('blue_car'), img('gray_cat'), img('blue_fish')] },
+      { id: 25, itemCount: 4, sequence: [img('red_apple'), img('crab'), img('basketball'), img('pink_balloon')] },
+    ],
+  },
+  // Session 6: Level 3 (exercises 26-30)
+  {
+    sessionNumber: 6, itemCount: 4, level: 3,
+    sequences: [
+      { id: 26, itemCount: 4, sequence: [img('orange_cat'), img('tiger'), img('lion'), img('giraffe')] },
+      { id: 27, itemCount: 4, sequence: [img('worm'), img('frog'), img('turtle'), img('lizard')] },
+      { id: 28, itemCount: 4, sequence: [img('basketball'), img('orange_balloon'), img('racket'), img('frisbee')] },
+      { id: 29, itemCount: 4, sequence: [img('blue_bicycle'), img('plane'), img('boat'), img('blue_car')] },
+      { id: 30, itemCount: 4, sequence: [img('cactus'), img('leaf'), img('orange_flower'), img('tree')] },
+    ],
+  },
 
-  // ============================================
-  // 5 IMAGES
-  // ============================================
-  
-  // 5 images - LEVEL 1 (exercises 31-35)
-  { id: 31, level: 1, itemCount: 5, sequence: ['cat', 'car', 'house', 'fish', 'snail'] },
-  { id: 32, level: 1, itemCount: 5, sequence: ['orange', 'tree', 'crab', 'moon', 'pear'] },
-  { id: 33, level: 1, itemCount: 5, sequence: ['fish', 'sun', 'lion', 'apple', 'ring'] },
-  { id: 34, level: 1, itemCount: 5, sequence: ['pear', 'ball', 'bicycle', 'chair', 'giraffe'] },
-  { id: 35, level: 1, itemCount: 5, sequence: ['balloon', 'car', 'tree', 'cat'] },
-  
-  // 5 images - LEVEL 2 (exercises 36-40)
-  { id: 36, level: 2, itemCount: 5, sequence: ['snail', 'balloon', 'lion', 'ball', 'giraffe'] },
-  { id: 37, level: 2, itemCount: 5, sequence: ['pear', 'tree', 'greenapple', 'umbrella', 'house'] },
-  { id: 38, level: 2, itemCount: 5, sequence: ['sun', 'ball', 'apple', 'ring', 'crab'] },
-  { id: 39, level: 2, itemCount: 5, sequence: ['moon', 'chair', 'cat', 'balloon', 'lion'] },
-  { id: 40, level: 2, itemCount: 5, sequence: ['car', 'house', 'bicycle', 'pencil', 'fish'] },
-  
-  // 5 images - LEVEL 3 (exercises 41-45)
-  { id: 41, level: 3, itemCount: 5, sequence: ['tiger', 'cat', 'lion', 'giraffe', 'dog'] },
-  { id: 42, level: 3, itemCount: 5, sequence: ['frog', 'lizard', 'turtle', 'caterpillar', 'fish'] },
-  { id: 43, level: 3, itemCount: 5, sequence: ['ball', 'racket', 'candy', 'balloon', 'frisbee'] },
-  { id: 44, level: 3, itemCount: 5, sequence: ['scooter', 'bicycle', 'ship', 'airplane', 'car'] },
-  { id: 45, level: 3, itemCount: 5, sequence: ['greenapple', 'flower', 'cactus', 'leaf', 'tree'] },
+  // --- 5 pictures ---
+  // Session 7: Level 1 (exercises 31-35)
+  {
+    sessionNumber: 7, itemCount: 5, level: 1,
+    sequences: [
+      { id: 31, itemCount: 5, sequence: [img('gray_cat'), img('blue_car'), img('house'), img('blue_fish'), img('snail')] },
+      { id: 32, itemCount: 5, sequence: [img('orange'), img('tree'), img('crab'), img('gray_moon'), img('pear')] },
+      { id: 33, itemCount: 5, sequence: [img('blue_fish'), img('sun_sunglasses'), img('lion'), img('red_apple'), img('ring')] },
+      { id: 34, itemCount: 5, sequence: [img('pear'), img('basketball'), img('blue_bicycle'), img('chair'), img('giraffe')] },
+      { id: 35, itemCount: 5, sequence: [img('umbrella'), img('green_balloon'), img('blue_car'), img('tree'), img('gray_cat')] },
+    ],
+  },
+  // Session 8: Level 2 (exercises 36-40)
+  {
+    sessionNumber: 8, itemCount: 5, level: 2,
+    sequences: [
+      { id: 36, itemCount: 5, sequence: [img('snail'), img('yellow_balloon'), img('lion'), img('basketball'), img('giraffe')] },
+      { id: 37, itemCount: 5, sequence: [img('pear'), img('tree'), img('green_apple'), img('umbrella'), img('house')] },
+      { id: 38, itemCount: 5, sequence: [img('sun_sunglasses'), img('basketball'), img('red_apple'), img('ring'), img('crab')] },
+      { id: 39, itemCount: 5, sequence: [img('orange_moon'), img('chair'), img('orange_cat'), img('yellow_balloon'), img('lion')] },
+      { id: 40, itemCount: 5, sequence: [img('blue_car'), img('house'), img('blue_bicycle'), img('blue_pencil'), img('blue_fish')] },
+    ],
+  },
+  // Session 9: Level 3 (exercises 41-45)
+  {
+    sessionNumber: 9, itemCount: 5, level: 3,
+    sequences: [
+      { id: 41, itemCount: 5, sequence: [img('tiger'), img('orange_cat'), img('lion'), img('giraffe'), img('dog')] },
+      { id: 42, itemCount: 5, sequence: [img('frog'), img('lizard'), img('turtle'), img('worm'), img('pufferfish')] },
+      { id: 43, itemCount: 5, sequence: [img('basketball'), img('racket'), img('candy'), img('orange_balloon'), img('frisbee')] },
+      { id: 44, itemCount: 5, sequence: [img('blue_scooter'), img('blue_bicycle'), img('boat'), img('plane'), img('blue_car')] },
+      { id: 45, itemCount: 5, sequence: [img('green_apple'), img('orange_flower'), img('cactus'), img('leaf'), img('tree')] },
+    ],
+  },
 
-  // ============================================
-  // 6 IMAGES
-  // ============================================
-  
-  // 6 images - LEVEL 1 (exercises 46-50)
-  { id: 46, level: 1, itemCount: 6, sequence: ['house', 'fish', 'snail', 'car', 'sun', 'moon'] },
-  { id: 47, level: 1, itemCount: 6, sequence: ['chair', 'balloon', 'apple', 'crab', 'tree', 'ball'] },
-  { id: 48, level: 1, itemCount: 6, sequence: ['ring', 'house', 'umbrella', 'pear', 'car', 'dog'] },
-  { id: 49, level: 1, itemCount: 6, sequence: ['ball', 'chair', 'moon', 'tree', 'fish', 'bicycle'] },
-  { id: 50, level: 1, itemCount: 6, sequence: ['cat', 'pear', 'snail', 'car', 'sun', 'house'] },
-  
-  // 6 images - LEVEL 2 (exercises 51-55)
-  { id: 51, level: 2, itemCount: 6, sequence: ['sun', 'lion', 'snail', 'balloon', 'ball', 'cat'] },
-  { id: 52, level: 2, itemCount: 6, sequence: ['pear', 'turtle', 'tennisball', 'tree', 'greenapple', 'leaf'] },
-  { id: 53, level: 2, itemCount: 6, sequence: ['giraffe', 'chair', 'house', 'cat', 'flower', 'moon'] },
-  { id: 54, level: 2, itemCount: 6, sequence: ['ball', 'ring', 'balloon', 'moon', 'apple', 'cat'] },
-  { id: 55, level: 2, itemCount: 6, sequence: ['umbrella', 'rainbow', 'house', 'fish', 'bicycle', 'ship'] },
-  
-  // 6 images - LEVEL 3 (exercises 56-60)
-  { id: 56, level: 3, itemCount: 6, sequence: ['apple', 'strawberry', 'cherry', 'orange', 'carrot', 'watermelon'] },
-  { id: 57, level: 3, itemCount: 6, sequence: ['pear', 'greenapple', 'lettuce', 'kiwi', 'cucumber', 'broccoli'] },
-  { id: 58, level: 3, itemCount: 6, sequence: ['banana', 'cheese', 'lemon', 'pineapple', 'orange', 'carrot'] },
-  { id: 59, level: 3, itemCount: 6, sequence: ['scooter', 'bicycle', 'ship', 'bus', 'airplane', 'car'] },
-  { id: 60, level: 3, itemCount: 6, sequence: ['palm', 'tree', 'leaf', 'flower', 'cactus', 'bush'] },
+  // --- 6 pictures ---
+  // Session 10: Level 1 (exercises 46-50)
+  {
+    sessionNumber: 10, itemCount: 6, level: 1,
+    sequences: [
+      { id: 46, itemCount: 6, sequence: [img('house'), img('blue_fish'), img('snail'), img('blue_car'), img('sun_sunglasses'), img('gray_moon')] },
+      { id: 47, itemCount: 6, sequence: [img('chair'), img('green_balloon'), img('red_apple'), img('crab'), img('tree'), img('basketball')] },
+      { id: 48, itemCount: 6, sequence: [img('ring'), img('house'), img('umbrella'), img('pear'), img('blue_car'), img('dog')] },
+      { id: 49, itemCount: 6, sequence: [img('basketball'), img('chair'), img('gray_moon'), img('tree'), img('blue_fish'), img('red_bicycle')] },
+      { id: 50, itemCount: 6, sequence: [img('gray_cat'), img('pear'), img('snail'), img('blue_car'), img('sun_sunglasses'), img('house')] },
+    ],
+  },
+  // Session 11: Level 2 (exercises 51-55)
+  {
+    sessionNumber: 11, itemCount: 6, level: 2,
+    sequences: [
+      { id: 51, itemCount: 6, sequence: [img('sun_sunglasses'), img('lion'), img('snail'), img('yellow_balloon'), img('basketball'), img('orange_cat')] },
+      { id: 52, itemCount: 6, sequence: [img('pear'), img('turtle'), img('tennis_ball'), img('tree'), img('green_apple'), img('leaf')] },
+      { id: 53, itemCount: 6, sequence: [img('giraffe'), img('chair'), img('house'), img('orange_cat'), img('orange_flower'), img('orange_moon')] },
+      { id: 54, itemCount: 6, sequence: [img('basketball'), img('ring'), img('yellow_balloon'), img('orange_moon'), img('red_apple'), img('orange_cat')] },
+      { id: 55, itemCount: 6, sequence: [img('umbrella'), img('rainbow'), img('house'), img('blue_fish'), img('blue_bicycle'), img('boat_side')] },
+    ],
+  },
+  // Session 12: Level 3 (exercises 56-60)
+  {
+    sessionNumber: 12, itemCount: 6, level: 3,
+    sequences: [
+      { id: 56, itemCount: 6, sequence: [img('apple_2'), img('strawberry'), img('cherry'), img('orange'), img('carrot'), img('watermelon')] },
+      { id: 57, itemCount: 6, sequence: [img('pear_2'), img('green_apple_2'), img('lettuce'), img('kiwi'), img('pickle'), img('broccoli')] },
+      { id: 58, itemCount: 6, sequence: [img('banana'), img('cheese'), img('lemon'), img('pineapple'), img('orange_3'), img('carrot')] },
+      { id: 59, itemCount: 6, sequence: [img('blue_scooter'), img('blue_bicycle'), img('boat'), img('bus'), img('plane'), img('blue_car')] },
+      { id: 60, itemCount: 6, sequence: [img('palm_tree'), img('tree'), img('leaf'), img('red_flower'), img('cactus'), img('bush')] },
+    ],
+  },
 
-  // ============================================
-  // 7 IMAGES
-  // ============================================
-  
-  // 7 images - LEVEL 1 (exercises 61-65)
-  { id: 61, level: 1, itemCount: 7, sequence: ['apple', 'fish', 'crab', 'car', 'sun', 'chair', 'ball'] },
-  { id: 62, level: 1, itemCount: 7, sequence: ['dog', 'balloon', 'snail', 'house', 'tree', 'fish', 'pear'] },
-  { id: 63, level: 1, itemCount: 7, sequence: ['house', 'ring', 'moon', 'car', 'lion', 'bicycle', 'giraffe'] },
-  { id: 64, level: 1, itemCount: 7, sequence: ['ball', 'chair', 'moon', 'tree', 'fish', 'bicycle'] },
-  { id: 65, level: 1, itemCount: 7, sequence: ['cat', 'pear', 'snail', 'car', 'orange', 'dog', 'pencil'] },
-  
-  // 7 images - LEVEL 2 (exercises 66-70)
-  { id: 66, level: 2, itemCount: 7, sequence: ['sun', 'snail', 'ring', 'lion', 'balloon', 'ball', 'moon'] },
-  { id: 67, level: 2, itemCount: 7, sequence: ['cactus', 'car', 'tree', 'greenapple', 'tennisball', 'turtle', 'pear'] },
-  { id: 68, level: 2, itemCount: 7, sequence: ['chair', 'giraffe', 'flower', 'balloon', 'moon', 'ball', 'cat'] },
-  { id: 69, level: 2, itemCount: 7, sequence: ['bicycle', 'fish', 'cloud', 'car', 'butterfly', 'house', 'flower'] },
-  { id: 70, level: 2, itemCount: 7, sequence: ['umbrella', 'apple', 'house', 'sneakers', 'rainbow', 'scooter', 'cup'] },
-  
-  // 7 images - LEVEL 3 (exercises 71-75)
-  { id: 71, level: 3, itemCount: 7, sequence: ['apple', 'orange', 'strawberry', 'carrot', 'cherry', 'watermelon', 'grapes'] },
-  { id: 72, level: 3, itemCount: 7, sequence: ['pear', 'greenapple', 'lettuce', 'kiwi', 'cucumber', 'broccoli', 'watermelon'] },
-  { id: 73, level: 3, itemCount: 7, sequence: ['banana', 'cheese', 'lemon', 'orange', 'pineapple', 'carrot', 'corn'] },
-  { id: 74, level: 3, itemCount: 7, sequence: ['scooter', 'bicycle', 'ship', 'airplane', 'bus', 'train', 'car'] },
-  { id: 75, level: 3, itemCount: 7, sequence: ['palm', 'cactus', 'leaf', 'grass', 'tree', 'flower', 'bush'] },
+  // --- 7 pictures ---
+  // Session 13: Level 1 (exercises 61-65)
+  {
+    sessionNumber: 13, itemCount: 7, level: 1,
+    sequences: [
+      { id: 61, itemCount: 7, sequence: [img('red_apple'), img('blue_fish'), img('crab'), img('blue_car'), img('sun_sunglasses'), img('chair'), img('basketball')] },
+      { id: 62, itemCount: 7, sequence: [img('dog'), img('green_balloon'), img('snail'), img('house'), img('tree'), img('blue_fish'), img('pear')] },
+      { id: 63, itemCount: 7, sequence: [img('house'), img('ring'), img('gray_moon'), img('blue_car'), img('lion'), img('red_bicycle'), img('giraffe')] },
+      { id: 64, itemCount: 7, sequence: [img('basketball'), img('chair'), img('tree'), img('umbrella'), img('gray_cat'), img('sun_sunglasses'), img('house')] },
+      { id: 65, itemCount: 7, sequence: [img('gray_cat'), img('pear'), img('snail'), img('blue_car'), img('orange'), img('dog'), img('pencil')] },
+    ],
+  },
+  // Session 14: Level 2 (exercises 66-70)
+  {
+    sessionNumber: 14, itemCount: 7, level: 2,
+    sequences: [
+      { id: 66, itemCount: 7, sequence: [img('sun_sunglasses'), img('snail'), img('ring'), img('lion'), img('yellow_balloon'), img('basketball'), img('orange_moon')] },
+      { id: 67, itemCount: 7, sequence: [img('cactus'), img('green_car'), img('tree'), img('green_apple'), img('tennis_ball'), img('turtle'), img('pear')] },
+      { id: 68, itemCount: 7, sequence: [img('chair'), img('giraffe'), img('orange_flower'), img('yellow_balloon'), img('orange_moon'), img('basketball'), img('orange_cat')] },
+      { id: 69, itemCount: 7, sequence: [img('blue_bicycle'), img('blue_fish'), img('cloud'), img('blue_car'), img('butterfly'), img('house'), img('blue_flower')] },
+      { id: 70, itemCount: 7, sequence: [img('umbrella'), img('red_apple'), img('house'), img('sneaker'), img('rainbow'), img('red_scooter'), img('purple_mug')] },
+    ],
+  },
+  // Session 15: Level 3 (exercises 71-75)
+  {
+    sessionNumber: 15, itemCount: 7, level: 3,
+    sequences: [
+      { id: 71, itemCount: 7, sequence: [img('apple_2'), img('orange_2'), img('strawberry'), img('carrot'), img('cherry'), img('watermelon'), img('grapes')] },
+      { id: 72, itemCount: 7, sequence: [img('pear_2'), img('green_apple_2'), img('lettuce'), img('kiwi'), img('pickle'), img('broccoli'), img('watermelon_2')] },
+      { id: 73, itemCount: 7, sequence: [img('banana'), img('cheese'), img('lemon'), img('orange_3'), img('pineapple'), img('carrot'), img('corn')] },
+      { id: 74, itemCount: 7, sequence: [img('blue_scooter'), img('blue_bicycle'), img('boat'), img('plane'), img('bus'), img('train'), img('blue_car')] },
+      { id: 75, itemCount: 7, sequence: [img('palm_tree'), img('cactus'), img('leaf'), img('grass'), img('tree'), img('red_flower'), img('bush')] },
+    ],
+  },
 ];
 
-// Get sequences for a specific session (5 examples per session)
-export function getSessionSequences(sessionNumber: number): MemorySequence[] {
-  const startIndex = ((sessionNumber - 1) * 5) % MEMORY_SEQUENCES.length;
-  const sequences: MemorySequence[] = [];
-  for (let i = 0; i < 5; i++) {
-    sequences.push(MEMORY_SEQUENCES[(startIndex + i) % MEMORY_SEQUENCES.length]);
-  }
-  return sequences;
+// Get a session by number (1-15)
+export function getMemorySession(sessionNumber: number): MemorySession {
+  const clamped = Math.max(1, Math.min(15, sessionNumber));
+  return MEMORY_SESSIONS[clamped - 1];
 }
 
-// Get all unique items for the selection grid (sequence items + distractors)
-export function getAllUniqueItems(sequence: MemorySequence): string[] {
+// Image path helper
+export function getMemoryImagePath(name: string): string {
+  return `/assets/visual-memory/${name}.png`;
+}
+
+// Get all unique items for the selection grid (sequence items + distractors from same session)
+export function getAllUniqueItems(sequence: MemorySequence, session: MemorySession): string[] {
   const allItems = new Set<string>();
-  
+
   // Add sequence items
-  sequence.sequence.forEach(item => allItems.add(item));
-  
-  // Add distractors from same level for increased difficulty
-  const sameLevelItems = MEMORY_SEQUENCES
-    .filter(s => s.level === sequence.level)
-    .flatMap(s => s.sequence);
-  
-  const distractors = Array.from(new Set(sameLevelItems)).filter(item => !sequence.sequence.includes(item));
-  const shuffledDistractors = distractors.sort(() => Math.random() - 0.5);
-  
-  // Add enough distractors to fill a 4x3 grid (12 items)
-  const neededDistractors = Math.max(0, 12 - allItems.size);
-  shuffledDistractors.slice(0, neededDistractors).forEach(item => allItems.add(item));
-  
-  // If still not enough, add from other levels
-  if (allItems.size < 12) {
-    const otherItems = Object.keys(MEMORY_ITEMS).filter(item => !allItems.has(item));
-    const shuffledOther = otherItems.sort(() => Math.random() - 0.5);
-    const stillNeeded = 12 - allItems.size;
-    shuffledOther.slice(0, stillNeeded).forEach(item => allItems.add(item));
+  sequence.sequence.forEach((item) => allItems.add(item));
+
+  // Add distractors from other sequences in the same session
+  for (const seq of session.sequences) {
+    if (seq.id === sequence.id) continue;
+    seq.sequence.forEach((item) => allItems.add(item));
   }
-  
-  // Shuffle and return
-  return Array.from(allItems).sort(() => Math.random() - 0.5);
-}
 
-// Get sequences by difficulty level
-export function getSequencesByLevel(level: number): MemorySequence[] {
-  return MEMORY_SEQUENCES.filter(s => s.level === level);
-}
-
-// Get sequences by item count
-export function getSequencesByItemCount(count: number): MemorySequence[] {
-  return MEMORY_SEQUENCES.filter(s => s.itemCount === count);
-}
-
-// Get a specific sequence by ID
-export function getSequenceById(id: number): MemorySequence | undefined {
-  return MEMORY_SEQUENCES.find(s => s.id === id);
-}
-
-// ============================================
-// PROCEDURAL GENERATION
-// ============================================
-
-// Seeded random number generator
-function seededRandom(seed: number): () => number {
-  return function() {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    return seed / 0x7fffffff;
-  };
-}
-
-// Shuffle array using seeded RNG
-function shuffleArraySeeded<T>(array: T[], rng: () => number): T[] {
-  const result = [...array];
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
+  // Shuffle using Fisher-Yates
+  const arr = Array.from(allItems);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-  return result;
-}
-
-// Item categories for generating diverse sequences
-const ITEM_CATEGORIES: Record<string, string[]> = {
-  animals: ['cat', 'dog', 'fish', 'crab', 'snail', 'lion', 'giraffe', 'turtle', 'frog', 'lizard', 'tiger', 'caterpillar', 'butterfly'],
-  fruits: ['apple', 'greenapple', 'pear', 'orange', 'strawberry', 'cherry', 'watermelon', 'banana', 'lemon', 'pineapple', 'grapes', 'kiwi'],
-  vegetables: ['carrot', 'cucumber', 'broccoli', 'lettuce', 'corn'],
-  vehicles: ['car', 'bicycle', 'scooter', 'airplane', 'ship', 'bus', 'train'],
-  nature: ['tree', 'sun', 'moon', 'flower', 'cactus', 'leaf', 'palm', 'grass', 'bush', 'rainbow', 'cloud'],
-  objects: ['chair', 'house', 'ball', 'balloon', 'pencil', 'ring', 'racket', 'umbrella', 'frisbee', 'candy', 'cheese', 'cup', 'sneakers', 'tennisball'],
-};
-
-// All items for procedural selection
-const ALL_ITEMS = Object.values(ITEM_CATEGORIES).flat();
-
-// Generate a procedural memory sequence
-// Difficulty affects: sequence length (3-7) and item similarity
-// Level 1: 3 items, different categories | Level 5: 7 items, same category
-export function generateMemorySequence(taskIndex: number, sessionSeed: number = Date.now(), difficulty: number = 1): MemorySequence {
-  const rng = seededRandom(sessionSeed + taskIndex * 1000);
-  
-  // Sequence length increases with difficulty: 3, 4, 5, 6, 7
-  const itemCount = 2 + difficulty;
-  
-  // Higher difficulty = more visually similar items
-  let sequence: string[];
-  
-  if (difficulty <= 2) {
-    // Easy: Visually different - pick from DIFFERENT categories
-    const shuffledCategories = shuffleArraySeeded(Object.keys(ITEM_CATEGORIES), rng);
-    sequence = [];
-    for (let i = 0; i < itemCount; i++) {
-      const category = shuffledCategories[i % shuffledCategories.length];
-      const items = ITEM_CATEGORIES[category];
-      sequence.push(items[Math.floor(rng() * items.length)]);
-    }
-  } else if (difficulty === 3) {
-    // Medium: Mix - some from same category, some from different
-    const primaryCategory = Object.keys(ITEM_CATEGORIES)[Math.floor(rng() * Object.keys(ITEM_CATEGORIES).length)];
-    const primaryItems = shuffleArraySeeded(ITEM_CATEGORIES[primaryCategory], rng);
-    const otherItems = shuffleArraySeeded(ALL_ITEMS.filter(i => !ITEM_CATEGORIES[primaryCategory].includes(i)), rng);
-    
-    sequence = [];
-    for (let i = 0; i < itemCount; i++) {
-      if (i < itemCount / 2) {
-        sequence.push(primaryItems[i % primaryItems.length]);
-      } else {
-        sequence.push(otherItems[i % otherItems.length]);
-      }
-    }
-    sequence = shuffleArraySeeded(sequence, rng);
-  } else {
-    // Hard (4-5): Visually similar - pick from SAME category
-    const category = Object.keys(ITEM_CATEGORIES)[Math.floor(rng() * Object.keys(ITEM_CATEGORIES).length)];
-    const items = shuffleArraySeeded(ITEM_CATEGORIES[category], rng);
-    sequence = items.slice(0, Math.min(itemCount, items.length));
-    
-    // If not enough items in category, add from all
-    while (sequence.length < itemCount) {
-      const additional = ALL_ITEMS[Math.floor(rng() * ALL_ITEMS.length)];
-      if (!sequence.includes(additional)) {
-        sequence.push(additional);
-      }
-    }
-  }
-  
-  return {
-    id: 100 + taskIndex,
-    level: difficulty,
-    itemCount,
-    sequence,
-  };
-}
-
-// Get sequence: first 75 are static, then procedural
-export function getMemorySequenceConfig(taskIndex: number, sessionSeed: number): MemorySequence {
-  if (taskIndex < MEMORY_SEQUENCES.length) {
-    return MEMORY_SEQUENCES[taskIndex];
-  }
-  return generateMemorySequence(taskIndex, sessionSeed);
+  return arr;
 }

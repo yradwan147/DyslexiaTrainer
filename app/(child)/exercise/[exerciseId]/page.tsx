@@ -45,8 +45,12 @@ export default function ExercisePage() {
   const startExercise = useCallback(async () => {
     try {
       const isSaccades = exerciseId === 'visual_saccades';
+      const isVisualSearch = exerciseId === 'visual_search';
+      const isVisualMemory = exerciseId === 'visual_memory';
+      const isMaze = exerciseId === 'maze_tracking';
+      const isLineTracking = exerciseId === 'line_tracking';
 
-      // Saccades: persist a per-browser 1–15 training run index
+      // Saccades: persist a per-browser 1-15 training run index
       let saccadesTrainingRunIndex: number | undefined;
       if (isSaccades) {
         const completedRaw = localStorage.getItem('saccadesTrainingRun');
@@ -54,7 +58,32 @@ export default function ExercisePage() {
         saccadesTrainingRunIndex = Math.min(15, completed + 1);
       }
 
-      const trialCount = isSaccades ? 1 : 10;
+      // Visual Search: persist a per-browser 1-15 training level
+      let effectiveDifficulty = difficulty;
+      if (isVisualSearch) {
+        const raw = localStorage.getItem('visualSearchTrainingLevel');
+        effectiveDifficulty = Math.max(1, Math.min(15, Number.parseInt(raw || '1', 10) || 1));
+      }
+
+      // Visual Memory: persist a per-browser 1-15 session number
+      if (isVisualMemory) {
+        const raw = localStorage.getItem('visualMemoryTrainingSession');
+        effectiveDifficulty = Math.max(1, Math.min(15, Number.parseInt(raw || '1', 10) || 1));
+      }
+
+      // Maze Tracking: persist a per-browser 1-15 level
+      if (isMaze) {
+        const raw = localStorage.getItem('mazeTrainingLevel');
+        effectiveDifficulty = Math.max(1, Math.min(15, Number.parseInt(raw || '1', 10) || 1));
+      }
+
+      // Line Tracking: persist a per-browser 1-15 level
+      if (isLineTracking) {
+        const raw = localStorage.getItem('lineTrackingLevel');
+        effectiveDifficulty = Math.max(1, Math.min(15, Number.parseInt(raw || '1', 10) || 1));
+      }
+
+      const trialCount = isSaccades ? 1 : (isVisualSearch || isVisualMemory || isMaze || isLineTracking) ? 1 : 10;
 
       // Create exercise run record
       const res = await fetch('/api/exercise-runs', {
@@ -63,7 +92,7 @@ export default function ExercisePage() {
         body: JSON.stringify({
           exercise_id: exerciseId,
           exercise_version: '1.0.0',
-          difficulty_level: difficulty,
+          difficulty_level: effectiveDifficulty,
           total_trials: trialCount,
         }),
       });
@@ -72,7 +101,7 @@ export default function ExercisePage() {
       setExerciseRunId(data.exerciseRun.id);
 
       // Generate exercise config
-      const config = getExerciseConfig(exerciseId, difficulty, trialCount);
+      const config = getExerciseConfig(exerciseId, effectiveDifficulty, trialCount);
       if (isSaccades && saccadesTrainingRunIndex) {
         config.training_run_index = saccadesTrainingRunIndex;
       }
@@ -113,6 +142,34 @@ export default function ExercisePage() {
       const completed = Math.max(0, Number.parseInt(completedRaw || '0', 10) || 0);
       localStorage.setItem('saccadesTrainingRun', String(Math.min(15, completed + 1)));
     }
+
+    // After completion, advance the Visual Search training level (up to 15).
+    if (exerciseId === 'visual_search') {
+      const raw = localStorage.getItem('visualSearchTrainingLevel');
+      const current = Math.max(1, Number.parseInt(raw || '1', 10) || 1);
+      localStorage.setItem('visualSearchTrainingLevel', String(Math.min(15, current + 1)));
+    }
+
+    // After completion, advance the Visual Memory training session (up to 15).
+    if (exerciseId === 'visual_memory') {
+      const raw = localStorage.getItem('visualMemoryTrainingSession');
+      const current = Math.max(1, Number.parseInt(raw || '1', 10) || 1);
+      localStorage.setItem('visualMemoryTrainingSession', String(Math.min(15, current + 1)));
+    }
+
+    // After completion, advance the Maze training level (up to 15).
+    if (exerciseId === 'maze_tracking') {
+      const raw = localStorage.getItem('mazeTrainingLevel');
+      const current = Math.max(1, Number.parseInt(raw || '1', 10) || 1);
+      localStorage.setItem('mazeTrainingLevel', String(Math.min(15, current + 1)));
+    }
+
+    // After completion, advance the Line Tracking level (up to 15).
+    if (exerciseId === 'line_tracking') {
+      const raw = localStorage.getItem('lineTrackingLevel');
+      const current = Math.max(1, Number.parseInt(raw || '1', 10) || 1);
+      localStorage.setItem('lineTrackingLevel', String(Math.min(15, current + 1)));
+    }
   }, [exerciseRunId, exerciseId]);
 
   // Handle exit
@@ -141,32 +198,39 @@ export default function ExercisePage() {
             {exerciseInfo.description}
           </p>
           
-          {/* Difficulty selector */}
-          <div className="mb-8">
-            <p className="text-sm text-slate-500 mb-3">Select Difficulty</p>
-            <div className="flex justify-center gap-2">
-              {[1, 2, 3, 4, 5].map((level) => (
-                <button
-                  key={level}
-                  onClick={() => setDifficulty(level)}
-                  className={`
-                    w-12 h-12 rounded-xl font-bold text-lg transition-all
-                    ${difficulty === level 
-                      ? 'bg-primary-500 text-white shadow-lg scale-110' 
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}
-                  `}
-                >
-                  {level}
-                </button>
-              ))}
+          {/* Difficulty selector - hidden for exercises with auto-progression */}
+          {!['visual_saccades', 'visual_search', 'visual_memory', 'maze_tracking', 'line_tracking'].includes(exerciseId) && (
+            <div className="mb-8">
+              <p className="text-sm text-slate-500 mb-3">Select Difficulty</p>
+              <div className="flex justify-center gap-2">
+                {[1, 2, 3, 4, 5].map((level) => (
+                  <button
+                    key={level}
+                    onClick={() => setDifficulty(level)}
+                    className={`
+                      w-12 h-12 rounded-xl font-bold text-lg transition-all
+                      ${difficulty === level 
+                        ? 'bg-primary-500 text-white shadow-lg scale-110' 
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}
+                    `}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-400 mt-2">
+                {difficulty === 1 ? 'Easy' : difficulty === 2 ? 'Medium' : difficulty === 3 ? 'Hard' : difficulty === 4 ? 'Very Hard' : 'Expert'}
+              </p>
             </div>
-            <p className="text-xs text-slate-400 mt-2">
-              {difficulty === 1 ? 'Easy' : difficulty === 2 ? 'Medium' : difficulty === 3 ? 'Hard' : difficulty === 4 ? 'Very Hard' : 'Expert'}
-            </p>
-          </div>
+          )}
 
           <p className="text-slate-500 mb-8">
-            {exerciseId === 'visual_saccades' ? '1 training run • Take your time!' : '10 trials • Take your time!'}
+            {exerciseId === 'visual_saccades' ? '1 training run • Take your time!'
+              : exerciseId === 'visual_search' ? '10 puzzles • Find the different one!'
+              : exerciseId === 'visual_memory' ? '5 sequences • Remember the order!'
+              : exerciseId === 'maze_tracking' ? '1 maze • Collect the treasures in order!'
+              : exerciseId === 'line_tracking' ? '1 puzzle • Follow the lines!'
+              : '10 trials • Take your time!'}
           </p>
           
           <div className="flex flex-col gap-4">

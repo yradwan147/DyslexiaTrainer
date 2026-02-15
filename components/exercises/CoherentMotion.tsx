@@ -70,13 +70,12 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
   // Keep canvas sizing SSR/hydration-safe (no window usage in render)
   useEffect(() => {
     const updateSize = () => {
-      if (!isFullscreen) {
-        setCanvasSize({ width: 900, height: 500 });
-        return;
-      }
-      // Leave some padding for header/buttons/instructions in fullscreen.
-      const width = Math.max(600, window.innerWidth - 100);
-      const height = Math.max(400, window.innerHeight - 200);
+      // Always use available viewport, whether fullscreen or not
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      // Reserve space for header, buttons, and instructions (~280px)
+      const width = Math.max(400, Math.min(vw - 40, 1200));
+      const height = Math.max(250, vh - 320);
       setCanvasSize({ width, height });
     };
 
@@ -271,7 +270,7 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
   return (
     <div 
       ref={containerRef}
-      className={`flex flex-col items-center gap-6 ${isFullscreen ? 'bg-black p-8' : ''}`}
+      className={`flex flex-col items-center gap-4 ${isFullscreen ? 'bg-black p-4 overflow-y-auto max-h-screen' : ''}`}
     >
       <div className="flex items-center gap-4">
         <h2 className="text-white text-xl font-bold">Coherent Motion Detection</h2>
@@ -306,11 +305,11 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
         )}
       </div>
 
-      <div className="flex gap-8">
+      <div className="flex gap-4 sm:gap-8">
         <button
           onClick={() => handleResponse('left')}
           disabled={hasResponded}
-          className="px-12 py-6 text-2xl font-bold bg-primary-500 text-white rounded-2xl 
+          className="px-8 py-4 sm:px-12 sm:py-6 text-xl sm:text-2xl font-bold bg-primary-500 text-white rounded-2xl 
                      hover:bg-primary-600 active:scale-95 transition-all
                      disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -319,7 +318,7 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
         <button
           onClick={() => handleResponse('right')}
           disabled={hasResponded}
-          className="px-12 py-6 text-2xl font-bold bg-primary-500 text-white rounded-2xl 
+          className="px-8 py-4 sm:px-12 sm:py-6 text-xl sm:text-2xl font-bold bg-primary-500 text-white rounded-2xl 
                      hover:bg-primary-600 active:scale-95 transition-all
                      disabled:opacity-50 disabled:cursor-not-allowed"
         >

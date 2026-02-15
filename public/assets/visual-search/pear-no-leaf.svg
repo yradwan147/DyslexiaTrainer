@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <!-- Pear WITHOUT leaf (just stem) - different from regular pear -->
-  <!-- Pear body - bulbous bottom, narrow top -->
-  <path d="M50 15 Q42 20 38 30 Q32 45 30 60 Q28 78 40 88 Q50 94 60 88 Q72 78 70 60 Q68 45 62 30 Q58 20 50 15 Z" fill="black"/>
-  <!-- Stem only - no leaf -->
-  <path d="M50 15 L52 4" fill="none" stroke="black" stroke-width="4" stroke-linecap="round"/>
-</svg>

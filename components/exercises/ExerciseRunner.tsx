@@ -202,7 +202,7 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
 
   // Running/Feedback phase
   return (
-    <div ref={containerRef} className="min-h-screen flex flex-col bg-slate-900">
+    <div ref={containerRef} className="h-screen flex flex-col bg-slate-900 overflow-hidden">
       {/* Progress bar */}
       <div className="p-4 bg-slate-800">
         <div className="max-w-2xl mx-auto flex items-center gap-4">
@@ -227,8 +227,8 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
         </div>
       </div>
 
-      {/* Exercise area */}
-      <div className="flex-1 flex items-center justify-center p-4">
+      {/* Exercise area -- fills remaining space, scrolls if needed */}
+      <div className="flex-1 min-h-0 flex items-center justify-center p-2 overflow-y-auto">
         {phase === 'feedback' ? (
           <Feedback 
             type={feedbackType} 

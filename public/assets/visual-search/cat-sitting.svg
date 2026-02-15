@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <!-- Cat sitting - black silhouette with pointed ears -->
-  <path d="M35 85 L35 65 Q32 55 35 45 L38 35 Q42 30 48 28 L48 22 Q50 18 52 18 Q54 18 56 22 L58 28 Q64 30 68 38 Q72 48 70 60 L70 85 Z" fill="black"/>
-  <!-- Pointed ears (distinctive from dog) -->
-  <path d="M42 22 L35 5 L48 18" fill="black"/>
-  <path d="M58 22 L65 5 L56 18" fill="black"/>
-  <!-- Curved tail going up -->
-  <path d="M70 65 Q78 60 82 50 Q85 40 80 35" fill="none" stroke="black" stroke-width="5" stroke-linecap="round"/>
-</svg>
