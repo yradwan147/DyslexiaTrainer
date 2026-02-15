@@ -49,6 +49,7 @@ export default function ExercisePage() {
       const isVisualMemory = exerciseId === 'visual_memory';
       const isMaze = exerciseId === 'maze_tracking';
       const isLineTracking = exerciseId === 'line_tracking';
+      const isPairSearch = exerciseId === 'pair_search';
 
       // Saccades: persist a per-browser 1-15 training run index
       let saccadesTrainingRunIndex: number | undefined;
@@ -83,7 +84,13 @@ export default function ExercisePage() {
         effectiveDifficulty = Math.max(1, Math.min(15, Number.parseInt(raw || '1', 10) || 1));
       }
 
-      const trialCount = isSaccades ? 1 : (isVisualSearch || isVisualMemory || isMaze || isLineTracking) ? 1 : 10;
+      // Pair Search: persist a per-browser 1-15 level
+      if (isPairSearch) {
+        const raw = localStorage.getItem('pairSearchLevel');
+        effectiveDifficulty = Math.max(1, Math.min(15, Number.parseInt(raw || '1', 10) || 1));
+      }
+
+      const trialCount = isSaccades ? 1 : (isVisualSearch || isVisualMemory || isMaze || isLineTracking || isPairSearch) ? 1 : 10;
 
       // Create exercise run record
       const res = await fetch('/api/exercise-runs', {
@@ -170,6 +177,13 @@ export default function ExercisePage() {
       const current = Math.max(1, Number.parseInt(raw || '1', 10) || 1);
       localStorage.setItem('lineTrackingLevel', String(Math.min(15, current + 1)));
     }
+
+    // After completion, advance the Pair Search level (up to 15).
+    if (exerciseId === 'pair_search') {
+      const raw = localStorage.getItem('pairSearchLevel');
+      const current = Math.max(1, Number.parseInt(raw || '1', 10) || 1);
+      localStorage.setItem('pairSearchLevel', String(Math.min(15, current + 1)));
+    }
   }, [exerciseRunId, exerciseId]);
 
   // Handle exit
@@ -199,7 +213,7 @@ export default function ExercisePage() {
           </p>
           
           {/* Difficulty selector - hidden for exercises with auto-progression */}
-          {!['visual_saccades', 'visual_search', 'visual_memory', 'maze_tracking', 'line_tracking'].includes(exerciseId) && (
+          {!['visual_saccades', 'visual_search', 'visual_memory', 'maze_tracking', 'line_tracking', 'pair_search'].includes(exerciseId) && (
             <div className="mb-8">
               <p className="text-sm text-slate-500 mb-3">Select Difficulty</p>
               <div className="flex justify-center gap-2">
@@ -230,6 +244,7 @@ export default function ExercisePage() {
               : exerciseId === 'visual_memory' ? '5 sequences • Remember the order!'
               : exerciseId === 'maze_tracking' ? '1 maze • Collect the treasures in order!'
               : exerciseId === 'line_tracking' ? '1 puzzle • Follow the lines!'
+              : exerciseId === 'pair_search' ? '1 puzzle • Find the matching shape!'
               : '10 trials • Take your time!'}
           </p>
           

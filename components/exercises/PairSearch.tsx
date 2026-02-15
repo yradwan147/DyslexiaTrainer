@@ -1,192 +1,120 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import type { ExerciseProps, PairSearchTrialConfig } from '@/lib/exercises/types';
-
-interface CardState {
-  item: string;
-  isFlipped: boolean;
-  isMatched: boolean;
-  position: [number, number];
-}
+import type { ExerciseProps } from '@/lib/exercises/types';
+import {
+  getPairSearchConfigForLevel,
+  getPairSearchImagePath,
+  type PairSearchConfig,
+} from '@/lib/exercises/pairSearchData';
 
 export function PairSearch({ config, currentTrialIndex, onTrialComplete }: ExerciseProps) {
-  const [cards, setCards] = useState<CardState[]>([]);
-  const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
-  const [matchedPairs, setMatchedPairs] = useState(0);
-  const [attempts, setAttempts] = useState(0);
-  const [isLocked, setIsLocked] = useState(false);
+  const level = Math.max(1, Math.min(15, config.difficulty_level || 1));
+  const puzzleConfig: PairSearchConfig = getPairSearchConfigForLevel(level);
+
+  const [selected, setSelected] = useState<number | null>(null);
+  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+  const [wrongAttempts, setWrongAttempts] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
 
-  const trial = config.trials[currentTrialIndex] as PairSearchTrialConfig;
-  const { grid_size, pairs } = trial;
-  const totalPairs = pairs.length;
-
-  // Initialize cards
+  // Reset on restart
   useEffect(() => {
+    setSelected(null);
+    setIsCorrect(null);
+    setWrongAttempts(0);
+    setIsComplete(false);
     startTimeRef.current = Date.now();
-    setMatchedPairs(0);
-    setAttempts(0);
-    setSelectedIndices([]);
-    setIsLocked(false);
+  }, [currentTrialIndex]);
 
-    const newCards: CardState[] = [];
-    for (const pair of pairs) {
-      for (const pos of pair.positions) {
-        newCards.push({
-          item: pair.item_id,
-          isFlipped: false,
-          isMatched: false,
-          position: pos,
-        });
-      }
-    }
-    setCards(newCards);
-  }, [currentTrialIndex, pairs]);
-
-  // Handle card click
-  const handleCardClick = useCallback((index: number) => {
-    if (isLocked) return;
-    if (cards[index].isFlipped || cards[index].isMatched) return;
-    if (selectedIndices.length >= 2) return;
-
-    // Flip the card
-    setCards(prev => {
-      const newCards = [...prev];
-      newCards[index] = { ...newCards[index], isFlipped: true };
-      return newCards;
+  const handleComplete = useCallback(() => {
+    onTrialComplete({
+      trial_index: currentTrialIndex,
+      user_response: JSON.stringify({ level, wrongAttempts, correctAnswer: puzzleConfig.correctAnswer }),
+      response_time_ms: Date.now() - startTimeRef.current,
+      is_correct: true,
+      is_timed_out: false,
+      is_skipped: false,
+      started_at: new Date(startTimeRef.current).toISOString(),
+      responded_at: new Date().toISOString(),
     });
+  }, [currentTrialIndex, level, wrongAttempts, puzzleConfig.correctAnswer, onTrialComplete]);
 
-    const newSelected = [...selectedIndices, index];
-    setSelectedIndices(newSelected);
+  const handleAnswer = useCallback(
+    (answerIdx: number) => {
+      if (isComplete || selected !== null) return;
 
-    if (newSelected.length === 2) {
-      setAttempts(prev => prev + 1);
-      setIsLocked(true);
+      setSelected(answerIdx);
 
-      const [first, second] = newSelected;
-      const isMatch = cards[first].item === cards[second].item;
-
-      setTimeout(() => {
-        if (isMatch) {
-          setCards(prev => {
-            const newCards = [...prev];
-            newCards[first] = { ...newCards[first], isMatched: true };
-            newCards[second] = { ...newCards[second], isMatched: true };
-            return newCards;
-          });
-          
-          const newMatchedCount = matchedPairs + 1;
-          setMatchedPairs(newMatchedCount);
-
-          if (newMatchedCount >= totalPairs) {
-            // All pairs found
-            setTimeout(() => {
-              onTrialComplete({
-                trial_index: currentTrialIndex,
-                user_response: JSON.stringify({ pairs: newMatchedCount, attempts: attempts + 1 }),
-                response_time_ms: Date.now() - startTimeRef.current,
-                is_correct: true,
-                is_timed_out: false,
-                is_skipped: false,
-                started_at: new Date(startTimeRef.current).toISOString(),
-                responded_at: new Date().toISOString(),
-              });
-            }, 500);
-          }
-        } else {
-          // Flip cards back
-          setCards(prev => {
-            const newCards = [...prev];
-            newCards[first] = { ...newCards[first], isFlipped: false };
-            newCards[second] = { ...newCards[second], isFlipped: false };
-            return newCards;
-          });
-        }
-
-        setSelectedIndices([]);
-        setIsLocked(false);
-      }, 800);
-    }
-  }, [isLocked, cards, selectedIndices, matchedPairs, totalPairs, attempts, currentTrialIndex, onTrialComplete]);
-
-  // Timeout handler
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (matchedPairs < totalPairs) {
-        onTrialComplete({
-          trial_index: currentTrialIndex,
-          user_response: JSON.stringify({ pairs: matchedPairs, attempts }),
-          response_time_ms: trial.stimulus_duration_ms,
-          is_correct: matchedPairs >= totalPairs * 0.5,
-          is_timed_out: true,
-          is_skipped: false,
-          started_at: new Date(startTimeRef.current).toISOString(),
-          responded_at: new Date().toISOString(),
-        });
+      if (answerIdx === puzzleConfig.correctAnswer) {
+        setIsCorrect(true);
+        setIsComplete(true);
+        setTimeout(() => handleComplete(), 1000);
+      } else {
+        setIsCorrect(false);
+        setWrongAttempts((prev) => prev + 1);
+        // Reset after brief feedback
+        setTimeout(() => {
+          setSelected(null);
+          setIsCorrect(null);
+        }, 600);
       }
-    }, trial.stimulus_duration_ms);
-
-    return () => clearTimeout(timeout);
-  }, [trial.stimulus_duration_ms, matchedPairs, totalPairs, attempts, currentTrialIndex, onTrialComplete]);
-
-  // Create grid layout
-  const gridCells: (CardState | null)[][] = [];
-  for (let y = 0; y < grid_size; y++) {
-    gridCells[y] = [];
-    for (let x = 0; x < grid_size; x++) {
-      const card = cards.find(c => c.position[0] === x && c.position[1] === y);
-      gridCells[y][x] = card || null;
-    }
-  }
+    },
+    [isComplete, selected, puzzleConfig.correctAnswer, handleComplete],
+  );
 
   return (
-    <div className="flex flex-col items-center gap-6">
-      <h2 className="text-white text-2xl font-bold">Find all matching pairs!</h2>
-      
-      <div className="flex gap-8 text-white text-lg">
-        <span>Pairs found: {matchedPairs} / {totalPairs}</span>
-        <span>Attempts: {attempts}</span>
-      </div>
-      
-      <div 
-        className="grid gap-3"
-        style={{ gridTemplateColumns: `repeat(${grid_size}, 1fr)` }}
-      >
-        {gridCells.flat().map((cell, idx) => {
-          if (!cell) {
-            return (
-              <div 
-                key={idx} 
-                className="w-20 h-20 bg-transparent"
-              />
-            );
-          }
+    <div className="flex flex-col items-center gap-3">
+      <h2 className="text-white text-xl font-bold">Find the Matching Shape!</h2>
 
-          const cardIndex = cards.indexOf(cell);
-          
+      <div className="flex items-center gap-3 text-slate-300 text-sm">
+        <span>Level {level}</span>
+      </div>
+
+      <p className="text-slate-400 text-xs">
+        Look at the shape on top. Which option below matches it exactly?
+      </p>
+
+      {/* Puzzle image */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden" style={{ maxWidth: 700, width: '100%' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={getPairSearchImagePath(puzzleConfig.imageFile)}
+          alt={`Pair search puzzle ${level}`}
+          style={{ width: '100%', height: 'auto', display: 'block' }}
+          draggable={false}
+        />
+      </div>
+
+      {/* 4 answer buttons below the image */}
+      <div className="flex gap-3 mt-1">
+        {[0, 1, 2, 3].map((idx) => {
+          const isThis = selected === idx;
+          const correct = isThis && isCorrect === true;
+          const wrong = isThis && isCorrect === false;
+
           return (
             <button
               key={idx}
-              onClick={() => handleCardClick(cardIndex)}
-              disabled={cell.isMatched || cell.isFlipped}
+              onClick={() => handleAnswer(idx)}
+              disabled={isComplete}
               className={`
-                w-20 h-20 text-4xl rounded-xl transition-all duration-300
-                flex items-center justify-center
-                ${cell.isMatched 
-                  ? 'bg-success-500/50 cursor-default' 
-                  : cell.isFlipped 
-                    ? 'bg-primary-500' 
-                    : 'bg-slate-600 hover:bg-slate-500 cursor-pointer'
-                }
+                w-16 h-16 rounded-xl text-2xl font-bold transition-all
+                ${correct ? 'bg-green-500 text-white ring-4 ring-green-300 scale-110' : ''}
+                ${wrong ? 'bg-red-500 text-white ring-4 ring-red-300 animate-shake' : ''}
+                ${!isThis ? 'bg-white text-slate-700 hover:bg-blue-50 hover:scale-105 shadow-md border-2 border-slate-200' : ''}
+                ${isComplete && !isThis ? 'opacity-50' : ''}
               `}
             >
-              {(cell.isFlipped || cell.isMatched) ? cell.item : '?'}
+              {idx + 1}
             </button>
           );
         })}
       </div>
+
+      {isComplete && (
+        <div className="text-green-400 text-lg font-bold animate-pulse">Correct!</div>
+      )}
     </div>
   );
 }
-
