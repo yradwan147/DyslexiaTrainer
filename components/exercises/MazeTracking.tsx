@@ -12,9 +12,10 @@ import {
 export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: ExerciseProps) {
   const level = Math.max(1, Math.min(15, config.difficulty_level || 1));
   const mazeConfig: MazeConfig = getMazeConfig(level);
-  const { grid_size, grid, player, objects, object_count, maze_id } = mazeConfig;
+  const { grid_size, grid, player, objects, object_count, maze_id, reachable_count } = mazeConfig;
 
   const [collectedSet, setCollectedSet] = useState<Set<number>>(new Set());
+  const [wrongClickOrder, setWrongClickOrder] = useState<number | null>(null);
   const [isComplete, setIsComplete] = useState(false);
   const [availableHeight, setAvailableHeight] = useState(500);
   const startTimeRef = useRef<number>(Date.now());
@@ -22,6 +23,7 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
 
   useEffect(() => {
     setCollectedSet(new Set());
+    setWrongClickOrder(null);
     setIsComplete(false);
     startTimeRef.current = Date.now();
   }, [currentTrialIndex]);
@@ -41,7 +43,7 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
   const handleComplete = useCallback(() => {
     onTrialComplete({
       trial_index: currentTrialIndex,
-      user_response: JSON.stringify({ maze_id, level, collected: object_count }),
+      user_response: JSON.stringify({ maze_id, level, collected: reachable_count }),
       response_time_ms: Date.now() - startTimeRef.current,
       is_correct: true,
       is_timed_out: false,
@@ -49,21 +51,36 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
       started_at: new Date(startTimeRef.current).toISOString(),
       responded_at: new Date().toISOString(),
     });
-  }, [currentTrialIndex, maze_id, level, object_count, onTrialComplete]);
+  }, [currentTrialIndex, maze_id, level, reachable_count, onTrialComplete]);
 
   const handleObjectClick = useCallback(
     (order: number) => {
       if (isComplete || collectedSet.has(order)) return;
-      // No enforced order -- any uncollected object can be clicked
+      
+      // Find the object to check if it's reachable
+      const obj = objects.find(o => o.order === order);
+      if (!obj) return;
+      
+      if (!obj.reachable) {
+        // Show red feedback for unreachable (incorrect) object
+        setWrongClickOrder(order);
+        setTimeout(() => setWrongClickOrder(null), 600);
+        return;
+      }
+      
+      // Collect reachable object
       const newSet = new Set(collectedSet);
       newSet.add(order);
       setCollectedSet(newSet);
-      if (newSet.size === object_count) {
+      
+      // Complete when all reachable objects are collected
+      const collectedReachable = objects.filter(o => o.reachable && newSet.has(o.order)).length;
+      if (collectedReachable === reachable_count) {
         setIsComplete(true);
         setTimeout(() => handleComplete(), 1200);
       }
     },
-    [isComplete, collectedSet, object_count, handleComplete],
+    [isComplete, collectedSet, objects, reachable_count, handleComplete],
   );
 
   // Dynamic cell size: fit maze into available height (with padding for the outer border visibility)
@@ -155,11 +172,13 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
           {/* Object sprites */}
           {objects.map((obj) => {
             const isCollected = collectedSet.has(obj.order);
+            const isWrongClick = wrongClickOrder === obj.order;
 
             return (
               <div
                 key={`obj-${obj.order}`}
                 onClick={() => handleObjectClick(obj.order)}
+                className={isWrongClick ? 'animate-shake' : ''}
                 style={{
                   position: 'absolute',
                   left: obj.col * cellSize,
@@ -171,9 +190,12 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  borderRadius: '4px',
+                  border: isWrongClick ? '3px solid #ef4444' : 'none',
+                  backgroundColor: isWrongClick ? 'rgba(239, 68, 68, 0.2)' : 'transparent',
+                  transition: 'border 0.1s, background-color 0.1s',
                 }}
               >
-                {/* No indicators -- child finds items by maze paths */}
                 {isCollected ? (
                   <span style={{ fontSize: cellSize * 0.6, color: '#22c55e' }}>✓</span>
                 ) : (
@@ -197,8 +219,22 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
 
       {/* Status */}
       <div className="text-slate-400 text-sm">
-        <span>Collected: {collectedSet.size} / {object_count}</span>
+        <span>Collected: {objects.filter(o => o.reachable && collectedSet.has(o.order)).length} / {reachable_count}</span>
       </div>
+
+      {/* Shake animation styles */}
+      <style jsx>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20% { transform: translateX(-4px); }
+          40% { transform: translateX(4px); }
+          60% { transform: translateX(-4px); }
+          80% { transform: translateX(4px); }
+        }
+        .animate-shake {
+          animation: shake 0.4s ease-in-out;
+        }
+      `}</style>
 
       {isComplete && (
         <div className="text-green-400 text-lg font-bold animate-pulse">Maze Complete!</div>

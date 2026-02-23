@@ -1,37 +1,39 @@
-// Pair Search (Visual Discrimination) Exercise Data
-// 15 puzzles using actual PNG images from /assets/pair-search/
-// Each puzzle: 1 target at top, 4 options below. Child picks the matching one.
+// Pair Search Exercise Data
+// 15 groups, each with 4 single object images
+// Each session: 4 rounds using the 4 singles from that group
+// Round: show one single as target, all 4 as options, child clicks matching one
 
-export interface PairSearchConfig {
-  id: number;
-  imageFile: string;       // e.g. '1.png'
-  correctAnswer: number;   // 0-3 index (0=leftmost option)
+export interface PairSearchGroup {
+  groupId: number;
+  singles: string[];  // 4 single image filenames, e.g. ['1_1.png', '1_2.png', '1_3.png', '1_4.png']
 }
 
-// Correct answers traced from the 15 reference images (0-indexed)
-export const PAIR_SEARCH_CONFIGS: PairSearchConfig[] = [
-  { id: 1,  imageFile: '1.png',  correctAnswer: 2 },
-  { id: 2,  imageFile: '2.png',  correctAnswer: 3 },
-  { id: 3,  imageFile: '3.png',  correctAnswer: 2 },
-  { id: 4,  imageFile: '4.png',  correctAnswer: 0 },
-  { id: 5,  imageFile: '5.png',  correctAnswer: 3 },
-  { id: 6,  imageFile: '6.png',  correctAnswer: 3 },
-  { id: 7,  imageFile: '7.png',  correctAnswer: 1 },
-  { id: 8,  imageFile: '8.png',  correctAnswer: 2 },
-  { id: 9,  imageFile: '9.png',  correctAnswer: 2 },
-  { id: 10, imageFile: '10.png', correctAnswer: 2 },
-  { id: 11, imageFile: '11.png', correctAnswer: 2 },
-  { id: 12, imageFile: '12.png', correctAnswer: 3 },
-  { id: 13, imageFile: '13.png', correctAnswer: 0 },
-  { id: 14, imageFile: '14.png', correctAnswer: 0 },
-  { id: 15, imageFile: '15.png', correctAnswer: 0 },
-];
+// Generate groups 1-15, each with 4 singles
+export const PAIR_SEARCH_GROUPS: PairSearchGroup[] = Array.from({ length: 15 }, (_, i) => ({
+  groupId: i + 1,
+  singles: [
+    `${i + 1}_1.png`,
+    `${i + 1}_2.png`,
+    `${i + 1}_3.png`,
+    `${i + 1}_4.png`,
+  ],
+}));
 
-export function getPairSearchConfigForLevel(level: number): PairSearchConfig {
-  const idx = Math.max(0, Math.min(level - 1, PAIR_SEARCH_CONFIGS.length - 1));
-  return PAIR_SEARCH_CONFIGS[idx];
+export function getPairSearchGroup(level: number): PairSearchGroup {
+  const idx = Math.max(0, Math.min(level - 1, PAIR_SEARCH_GROUPS.length - 1));
+  return PAIR_SEARCH_GROUPS[idx];
 }
 
-export function getPairSearchImagePath(imageFile: string): string {
-  return `/assets/pair-search/${imageFile}`;
+export function getSingleImagePath(filename: string): string {
+  return `/assets/pair-search/singles/${filename}`;
+}
+
+// Shuffle array (Fisher-Yates)
+export function shuffleArray<T>(array: T[]): T[] {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }

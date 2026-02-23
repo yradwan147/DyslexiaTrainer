@@ -1,36 +1,66 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import type { ExerciseProps } from '@/lib/exercises/types';
 import {
-  getPairSearchConfigForLevel,
-  getPairSearchImagePath,
-  type PairSearchConfig,
+  getPairSearchGroup,
+  getSingleImagePath,
+  shuffleArray,
+  type PairSearchGroup,
 } from '@/lib/exercises/pairSearchData';
+
+const ROUNDS_PER_SESSION = 4;
 
 export function PairSearch({ config, currentTrialIndex, onTrialComplete }: ExerciseProps) {
   const level = Math.max(1, Math.min(15, config.difficulty_level || 1));
-  const puzzleConfig: PairSearchConfig = getPairSearchConfigForLevel(level);
+  const group: PairSearchGroup = getPairSearchGroup(level);
 
+  const [currentRound, setCurrentRound] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [wrongAttempts, setWrongAttempts] = useState(0);
-  const [isComplete, setIsComplete] = useState(false);
+  const [totalWrongAttempts, setTotalWrongAttempts] = useState(0);
+  const [isSessionComplete, setIsSessionComplete] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
 
-  // Reset on restart
+  // Generate round order (which singles to show as targets, in shuffled order)
+  const roundOrder = useMemo(() => shuffleArray([0, 1, 2, 3]), [level]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Shuffled options for the current round
+  const [shuffledOptions, setShuffledOptions] = useState<number[]>([]);
+
+  // Current target index (0-3)
+  const targetIdx = roundOrder[currentRound];
+  const targetImage = group.singles[targetIdx];
+
+  // Reset on exercise restart
   useEffect(() => {
+    setCurrentRound(0);
     setSelected(null);
     setIsCorrect(null);
     setWrongAttempts(0);
-    setIsComplete(false);
+    setTotalWrongAttempts(0);
+    setIsSessionComplete(false);
     startTimeRef.current = Date.now();
   }, [currentTrialIndex]);
+
+  // Shuffle options when round changes
+  useEffect(() => {
+    setShuffledOptions(shuffleArray([0, 1, 2, 3]));
+    setSelected(null);
+    setIsCorrect(null);
+    setWrongAttempts(0);
+  }, [currentRound]);
 
   const handleComplete = useCallback(() => {
     onTrialComplete({
       trial_index: currentTrialIndex,
-      user_response: JSON.stringify({ level, wrongAttempts, correctAnswer: puzzleConfig.correctAnswer }),
+      user_response: JSON.stringify({ 
+        level, 
+        totalWrongAttempts, 
+        roundsCompleted: ROUNDS_PER_SESSION,
+        groupId: group.groupId,
+      }),
       response_time_ms: Date.now() - startTimeRef.current,
       is_correct: true,
       is_timed_out: false,
@@ -38,83 +68,115 @@ export function PairSearch({ config, currentTrialIndex, onTrialComplete }: Exerc
       started_at: new Date(startTimeRef.current).toISOString(),
       responded_at: new Date().toISOString(),
     });
-  }, [currentTrialIndex, level, wrongAttempts, puzzleConfig.correctAnswer, onTrialComplete]);
+  }, [currentTrialIndex, level, totalWrongAttempts, group.groupId, onTrialComplete]);
+
+  const advanceRound = useCallback(() => {
+    if (currentRound + 1 >= ROUNDS_PER_SESSION) {
+      setIsSessionComplete(true);
+      setTimeout(() => handleComplete(), 1200);
+    } else {
+      setCurrentRound((prev) => prev + 1);
+    }
+  }, [currentRound, handleComplete]);
 
   const handleAnswer = useCallback(
-    (answerIdx: number) => {
-      if (isComplete || selected !== null) return;
+    (optionIdx: number) => {
+      if (isSessionComplete || selected !== null) return;
 
-      setSelected(answerIdx);
+      // optionIdx is the index in shuffledOptions, need to find the actual single index
+      const actualIdx = shuffledOptions[optionIdx];
+      setSelected(optionIdx);
 
-      if (answerIdx === puzzleConfig.correctAnswer) {
+      if (actualIdx === targetIdx) {
         setIsCorrect(true);
-        setIsComplete(true);
-        setTimeout(() => handleComplete(), 1000);
+        setTimeout(() => advanceRound(), 800);
       } else {
         setIsCorrect(false);
         setWrongAttempts((prev) => prev + 1);
-        // Reset after brief feedback
+        setTotalWrongAttempts((prev) => prev + 1);
         setTimeout(() => {
           setSelected(null);
           setIsCorrect(null);
-        }, 600);
+        }, 500);
       }
     },
-    [isComplete, selected, puzzleConfig.correctAnswer, handleComplete],
+    [isSessionComplete, selected, shuffledOptions, targetIdx, advanceRound],
   );
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <h2 className="text-white text-xl font-bold">Find the Matching Shape!</h2>
+    <div className="flex flex-col items-center gap-4">
+      <h2 className="text-white text-2xl font-bold">Find the Match!</h2>
 
-      <div className="flex items-center gap-3 text-slate-300 text-sm">
-        <span>Level {level}</span>
+      <div className="flex items-center gap-4 text-slate-300">
+        <span className="text-lg">Round {currentRound + 1} of {ROUNDS_PER_SESSION}</span>
+        <span className="px-2 py-1 bg-slate-700 rounded text-sm">Level {level}</span>
       </div>
 
-      <p className="text-slate-400 text-xs">
-        Look at the shape on top. Which option below matches it exactly?
+      <p className="text-slate-400 text-sm">
+        Click the image below that matches the target above
       </p>
 
-      {/* Puzzle image */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden" style={{ maxWidth: 700, width: '100%' }}>
+      {/* Target image at top */}
+      <div className="bg-white rounded-xl shadow-lg p-4">
+        <p className="text-slate-500 text-sm text-center mb-2">Target:</p>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={getPairSearchImagePath(puzzleConfig.imageFile)}
-          alt={`Pair search puzzle ${level}`}
-          style={{ width: '100%', height: 'auto', display: 'block' }}
+          src={getSingleImagePath(targetImage)}
+          alt="Target"
+          style={{ width: 120, height: 120, objectFit: 'contain' }}
           draggable={false}
         />
       </div>
 
-      {/* 4 answer buttons below the image */}
-      <div className="flex gap-3 mt-1">
-        {[0, 1, 2, 3].map((idx) => {
-          const isThis = selected === idx;
+      {/* 4 answer options below */}
+      <div className="flex gap-4 flex-wrap justify-center">
+        {shuffledOptions.map((singleIdx, optionIdx) => {
+          const isThis = selected === optionIdx;
           const correct = isThis && isCorrect === true;
           const wrong = isThis && isCorrect === false;
 
           return (
             <button
-              key={idx}
-              onClick={() => handleAnswer(idx)}
-              disabled={isComplete}
+              key={optionIdx}
+              onClick={() => handleAnswer(optionIdx)}
+              disabled={isSessionComplete}
               className={`
-                w-16 h-16 rounded-xl text-2xl font-bold transition-all
-                ${correct ? 'bg-green-500 text-white ring-4 ring-green-300 scale-110' : ''}
-                ${wrong ? 'bg-red-500 text-white ring-4 ring-red-300 animate-shake' : ''}
-                ${!isThis ? 'bg-white text-slate-700 hover:bg-blue-50 hover:scale-105 shadow-md border-2 border-slate-200' : ''}
-                ${isComplete && !isThis ? 'opacity-50' : ''}
+                rounded-xl p-3 transition-all
+                ${correct ? 'bg-green-100 ring-4 ring-green-400 scale-110' : ''}
+                ${wrong ? 'bg-red-100 ring-4 ring-red-400 animate-shake' : ''}
+                ${!isThis ? 'bg-white hover:bg-blue-50 hover:scale-105 shadow-lg border-2 border-slate-200' : ''}
+                ${isSessionComplete && !isThis ? 'opacity-50' : ''}
               `}
             >
-              {idx + 1}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={getSingleImagePath(group.singles[singleIdx])}
+                alt={`Option ${optionIdx + 1}`}
+                style={{ width: 100, height: 100, objectFit: 'contain' }}
+                draggable={false}
+              />
             </button>
           );
         })}
       </div>
 
-      {isComplete && (
-        <div className="text-green-400 text-lg font-bold animate-pulse">Correct!</div>
+      {isSessionComplete && (
+        <div className="text-green-400 text-xl font-bold animate-pulse">All rounds complete!</div>
       )}
+
+      {/* Shake animation */}
+      <style jsx>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20% { transform: translateX(-4px); }
+          40% { transform: translateX(4px); }
+          60% { transform: translateX(-4px); }
+          80% { transform: translateX(4px); }
+        }
+        .animate-shake {
+          animation: shake 0.4s ease-in-out;
+        }
+      `}</style>
     </div>
   );
 }

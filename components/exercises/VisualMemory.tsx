@@ -223,7 +223,7 @@ export function VisualMemory({ config, currentTrialIndex, onTrialComplete }: Exe
           <div className="text-green-400 text-2xl font-bold animate-pulse">Perfect!</div>
           <div className="flex gap-2 flex-nowrap">
             {currentSequence.sequence.map((item, idx) => (
-              <div key={idx} className="bg-green-100 rounded-lg p-2 shrink-0">
+              <div key={idx} className="bg-white rounded-lg p-2 shrink-0 ring-2 ring-green-400">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={getMemoryImagePath(item)}

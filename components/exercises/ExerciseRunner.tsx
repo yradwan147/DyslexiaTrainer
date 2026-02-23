@@ -33,6 +33,7 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
   const [results, setResults] = useState<TrialResult[]>([]);
   const [feedbackType, setFeedbackType] = useState<'correct' | 'incorrect' | null>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const totalTrials = config.trials.length;
@@ -85,6 +86,26 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
     }
     setPhase('running');
   };
+
+  // Fullscreen toggle handler
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return;
+    
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      containerRef.current.requestFullscreen().catch(() => {});
+    }
+  }, []);
+
+  // Sync fullscreen state with browser fullscreenchange event
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   // Pause handling
   useEffect(() => {
@@ -217,6 +238,27 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
               color="primary"
             />
           </div>
+          <button 
+            onClick={toggleFullscreen}
+            className="text-slate-400 hover:text-white p-2 text-lg"
+            title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+          >
+            {isFullscreen ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 14 10 14 10 20"></polyline>
+                <polyline points="20 10 14 10 14 4"></polyline>
+                <line x1="14" y1="10" x2="21" y2="3"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+            )}
+          </button>
           <button 
             onClick={() => setIsPaused(true)}
             className="text-slate-400 hover:text-white p-2"
