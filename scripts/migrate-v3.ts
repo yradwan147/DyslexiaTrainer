@@ -26,6 +26,17 @@ function migrate() {
 
   console.log('[Migration] Starting v3.0.0 migration...');
 
+  // Check if the database has been initialized (studies table exists)
+  const tableCheck = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='studies'"
+  ).get();
+
+  if (!tableCheck) {
+    console.log('[Migration] Fresh database — no tables yet. Skipping migration (schema will be created on first app start).');
+    db.close();
+    return;
+  }
+
   const transaction = db.transaction(() => {
     // 1. Add sessions_per_day column to studies if not exists
     const studyCols = db.prepare("PRAGMA table_info(studies)").all() as { name: string }[];
