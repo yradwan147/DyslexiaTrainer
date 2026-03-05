@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -180,7 +181,13 @@ export default function ParticipantsPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 space-x-3">
+                      <Link
+                        href={`/admin/participants/${p.user_id}`}
+                        className="text-primary-500 hover:text-primary-600 text-sm font-medium"
+                      >
+                        Progress
+                      </Link>
                       <button
                         onClick={() => handleDelete(p.id)}
                         className="text-danger-500 hover:text-danger-600 text-sm"

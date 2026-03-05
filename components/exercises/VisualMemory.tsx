@@ -175,7 +175,7 @@ export function VisualMemory({ config, currentTrialIndex, onTrialComplete }: Exe
       {/* User's current selection */}
       <div className="flex gap-2 min-h-16 flex-nowrap">
         {userSequence.map((item, idx) => (
-          <div key={idx} className="bg-blue-100 rounded-lg p-2 flex items-center justify-center shrink-0">
+          <div key={idx} className="bg-white border border-slate-200 rounded-lg p-2 flex items-center justify-center shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={getMemoryImagePath(item)}

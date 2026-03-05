@@ -270,7 +270,7 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
   return (
     <div 
       ref={containerRef}
-      className={`flex flex-col items-center gap-4 ${isFullscreen ? 'bg-black p-4 overflow-y-auto max-h-screen' : ''}`}
+      className={`flex flex-col items-center justify-center gap-4 ${isFullscreen ? 'bg-black p-4 overflow-y-auto max-h-screen' : ''}`}
     >
       <div className="flex items-center gap-4">
         <h2 className="text-white text-xl font-bold">Coherent Motion Detection</h2>
@@ -313,22 +313,18 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
                      hover:bg-primary-600 active:scale-95 transition-all
                      disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          ← Left
+          ←
         </button>
         <button
           onClick={() => handleResponse('right')}
           disabled={hasResponded}
-          className="px-8 py-4 sm:px-12 sm:py-6 text-xl sm:text-2xl font-bold bg-primary-500 text-white rounded-2xl 
+          className="px-8 py-4 sm:px-12 sm:py-6 text-xl sm:text-2xl font-bold bg-primary-500 text-white rounded-2xl
                      hover:bg-primary-600 active:scale-95 transition-all
                      disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Right →
+          →
         </button>
       </div>
-      
-      <p className="text-slate-400 text-sm">
-        Which side has dots moving together? Use arrow keys or click the buttons.
-      </p>
     </div>
   );
 }

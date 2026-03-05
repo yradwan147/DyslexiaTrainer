@@ -49,18 +49,19 @@ export async function POST(request: NextRequest) {
     end_date,
     target_sessions,
     session_duration_minutes,
+    sessions_per_day,
     exercises,
   } = body;
 
   // Create study
   const result = db.prepare(`
-    INSERT INTO studies (name, description, start_date, end_date, target_sessions, session_duration_minutes)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(name, description || null, start_date || null, end_date || null, target_sessions || 15, session_duration_minutes || 30);
+    INSERT INTO studies (name, description, start_date, end_date, target_sessions, session_duration_minutes, sessions_per_day)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(name, description || null, start_date || null, end_date || null, target_sessions || 15, session_duration_minutes || 30, sessions_per_day || 1);
 
   const studyId = result.lastInsertRowid;
 
-  // Add exercises
+  // Add exercises to study_exercises (legacy) and session template
   if (exercises && exercises.length > 0) {
     const insertExercise = db.prepare(`
       INSERT INTO study_exercises (study_id, exercise_id, exercise_version, difficulty_level, trial_count, display_order)
@@ -73,6 +74,28 @@ export async function POST(request: NextRequest) {
         ex.exercise_id,
         ex.exercise_version || '1.0.0',
         ex.difficulty_level || 1,
+        ex.trial_count || 10,
+        ex.display_order
+      );
+    }
+
+    // Create session template 1 with the same exercises
+    const templateResult = db.prepare(`
+      INSERT INTO session_templates (study_id, template_number, label)
+      VALUES (?, 1, 'Default')
+    `).run(studyId);
+
+    const templateId = templateResult.lastInsertRowid;
+    const insertTemplateEx = db.prepare(`
+      INSERT INTO session_template_exercises (template_id, exercise_id, exercise_version, trial_count, display_order)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    for (const ex of exercises) {
+      insertTemplateEx.run(
+        templateId,
+        ex.exercise_id,
+        ex.exercise_version || '1.0.0',
         ex.trial_count || 10,
         ex.display_order
       );

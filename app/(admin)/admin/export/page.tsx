@@ -12,8 +12,8 @@ interface Study {
 export default function ExportPage() {
   const [studies, setStudies] = useState<Study[]>([]);
   const [selectedStudy, setSelectedStudy] = useState<string>('');
-  const [exportType, setExportType] = useState<'sessions' | 'trials' | 'exercise_runs'>('sessions');
-  const [format, setFormat] = useState<'csv' | 'json'>('csv');
+  const [exportType, setExportType] = useState<'sessions' | 'trials' | 'exercise_runs' | 'metrics'>('exercise_runs');
+  const [format, setFormat] = useState<'csv' | 'json' | 'xlsx'>('xlsx');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [previewData, setPreviewData] = useState<Record<string, unknown>[] | null>(null);
@@ -64,12 +64,14 @@ export default function ExportPage() {
 
       const res = await fetch(`/api/export?${params}`);
       
-      if (format === 'csv') {
+      if (format === 'xlsx' || format === 'csv') {
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${exportType}_export_${new Date().toISOString().split('T')[0]}.csv`;
+        const ext = format === 'xlsx' ? 'xlsx' : 'csv';
+        const prefix = format === 'xlsx' ? 'dyslexia_trainer' : exportType;
+        a.download = `${prefix}_export_${new Date().toISOString().split('T')[0]}.${ext}`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -106,7 +108,7 @@ export default function ExportPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-slate-800 mb-2">Export Data</h1>
-        <p className="text-slate-600">Download research data in CSV or JSON format</p>
+        <p className="text-slate-600">Download research data in Excel, CSV, or JSON format</p>
       </div>
 
       <Card>
@@ -121,9 +123,10 @@ export default function ExportPage() {
               onChange={(e) => setExportType(e.target.value as typeof exportType)}
               className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-primary-500 focus:ring-4 focus:ring-primary-200"
             >
-              <option value="sessions">Sessions (summary level)</option>
               <option value="exercise_runs">Exercise Runs (per exercise)</option>
               <option value="trials">Trials (detailed per-trial)</option>
+              <option value="metrics">Metrics (exercise-specific measurements)</option>
+              <option value="sessions">Sessions (summary level)</option>
             </select>
           </div>
 
@@ -146,6 +149,16 @@ export default function ExportPage() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Format</label>
             <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  value="xlsx"
+                  checked={format === 'xlsx'}
+                  onChange={() => setFormat('xlsx')}
+                  className="w-5 h-5 text-primary-500"
+                />
+                <span className="font-medium">Excel (.xlsx)</span>
+              </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"

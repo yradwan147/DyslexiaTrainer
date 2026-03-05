@@ -112,13 +112,8 @@ export function PairSearch({ config, currentTrialIndex, onTrialComplete }: Exerc
         <span className="px-2 py-1 bg-slate-700 rounded text-sm">Level {level}</span>
       </div>
 
-      <p className="text-slate-400 text-sm">
-        Click the image below that matches the target above
-      </p>
-
       {/* Target image at top */}
       <div className="bg-white rounded-xl shadow-lg p-4">
-        <p className="text-slate-500 text-sm text-center mb-2">Target:</p>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={getSingleImagePath(targetImage)}

@@ -21,12 +21,18 @@ const EXERCISE_INFO: Record<string, { name: string; description: string; icon: s
   pair_search: { name: 'Pair Search', description: 'Find matching pairs', icon: '🃏' },
 };
 
+// Exercises that use auto-progression (level tracked server-side)
+const AUTO_PROGRESSION_EXERCISES = [
+  'visual_saccades', 'visual_search', 'visual_memory',
+  'maze_tracking', 'line_tracking', 'pair_search',
+];
+
 type Phase = 'intro' | 'exercise' | 'complete';
 
 export default function ExercisePage() {
   const router = useRouter();
   const params = useParams();
-  
+
   const exerciseId = params.exerciseId as string;
 
   const [phase, setPhase] = useState<Phase>('intro');
@@ -34,63 +40,65 @@ export default function ExercisePage() {
   const [currentConfig, setCurrentConfig] = useState<ExerciseConfig | null>(null);
   const [results, setResults] = useState<{ correct: number; total: number }>({ correct: 0, total: 0 });
   const [difficulty, setDifficulty] = useState(1);
+  const [serverLevel, setServerLevel] = useState<number | null>(null);
 
-  const exerciseInfo = EXERCISE_INFO[exerciseId] || { 
-    name: exerciseId, 
-    description: 'Complete the exercise', 
-    icon: '🎯' 
+  const exerciseInfo = EXERCISE_INFO[exerciseId] || {
+    name: exerciseId,
+    description: 'Complete the exercise',
+    icon: '🎯'
   };
+
+  const isAutoProgression = AUTO_PROGRESSION_EXERCISES.includes(exerciseId);
+
+  // Fetch server-side progress on mount for auto-progression exercises
+  useEffect(() => {
+    if (!isAutoProgression) return;
+
+    fetch(`/api/exercise-progress?exerciseId=${exerciseId}`)
+      .then(res => res.json())
+      .then(data => {
+        setServerLevel(data.current_level || 1);
+      })
+      .catch(() => {
+        // Fallback to localStorage for backwards compatibility
+        const keyMap: Record<string, string> = {
+          visual_saccades: 'saccadesTrainingRun',
+          visual_search: 'visualSearchTrainingLevel',
+          visual_memory: 'visualMemoryTrainingSession',
+          maze_tracking: 'mazeTrainingLevel',
+          line_tracking: 'lineTrackingLevel',
+          pair_search: 'pairSearchLevel',
+        };
+        const key = keyMap[exerciseId];
+        if (key) {
+          const raw = localStorage.getItem(key);
+          setServerLevel(Math.max(1, Math.min(15, Number.parseInt(raw || '1', 10) || 1)));
+        } else {
+          setServerLevel(1);
+        }
+      });
+  }, [exerciseId, isAutoProgression]);
 
   // Start exercise
   const startExercise = useCallback(async () => {
     try {
       const isSaccades = exerciseId === 'visual_saccades';
-      const isVisualSearch = exerciseId === 'visual_search';
-      const isVisualMemory = exerciseId === 'visual_memory';
-      const isMaze = exerciseId === 'maze_tracking';
-      const isLineTracking = exerciseId === 'line_tracking';
-      const isPairSearch = exerciseId === 'pair_search';
 
-      // Saccades: persist a per-browser 1-15 training run index
-      let saccadesTrainingRunIndex: number | undefined;
-      if (isSaccades) {
-        const completedRaw = localStorage.getItem('saccadesTrainingRun');
-        const completed = Math.max(0, Number.parseInt(completedRaw || '0', 10) || 0);
-        saccadesTrainingRunIndex = Math.min(15, completed + 1);
-      }
-
-      // Visual Search: persist a per-browser 1-15 training level
+      // Determine effective difficulty
       let effectiveDifficulty = difficulty;
-      if (isVisualSearch) {
-        const raw = localStorage.getItem('visualSearchTrainingLevel');
-        effectiveDifficulty = Math.max(1, Math.min(15, Number.parseInt(raw || '1', 10) || 1));
+      if (isAutoProgression && serverLevel !== null) {
+        effectiveDifficulty = serverLevel;
       }
 
-      // Visual Memory: persist a per-browser 1-15 session number
-      if (isVisualMemory) {
-        const raw = localStorage.getItem('visualMemoryTrainingSession');
-        effectiveDifficulty = Math.max(1, Math.min(15, Number.parseInt(raw || '1', 10) || 1));
+      // Saccades training run index
+      let saccadesTrainingRunIndex: number | undefined;
+      if (isSaccades && serverLevel !== null) {
+        saccadesTrainingRunIndex = serverLevel;
       }
 
-      // Maze Tracking: persist a per-browser 1-15 level
-      if (isMaze) {
-        const raw = localStorage.getItem('mazeTrainingLevel');
-        effectiveDifficulty = Math.max(1, Math.min(15, Number.parseInt(raw || '1', 10) || 1));
-      }
-
-      // Line Tracking: persist a per-browser 1-15 level
-      if (isLineTracking) {
-        const raw = localStorage.getItem('lineTrackingLevel');
-        effectiveDifficulty = Math.max(1, Math.min(15, Number.parseInt(raw || '1', 10) || 1));
-      }
-
-      // Pair Search: persist a per-browser 1-15 level
-      if (isPairSearch) {
-        const raw = localStorage.getItem('pairSearchLevel');
-        effectiveDifficulty = Math.max(1, Math.min(15, Number.parseInt(raw || '1', 10) || 1));
-      }
-
-      const trialCount = isSaccades ? 1 : (isVisualSearch || isVisualMemory || isMaze || isLineTracking || isPairSearch) ? 1 : 10;
+      const trialCount = isSaccades ? 1
+        : isAutoProgression ? 1
+        : 10;
 
       // Create exercise run record
       const res = await fetch('/api/exercise-runs', {
@@ -118,7 +126,7 @@ export default function ExercisePage() {
       console.error('Error starting exercise:', error);
       alert('Failed to start exercise');
     }
-  }, [exerciseId, difficulty]);
+  }, [exerciseId, difficulty, isAutoProgression, serverLevel]);
 
   // Handle exercise completion
   const handleExerciseComplete = useCallback(async (trialResults: TrialResult[]) => {
@@ -143,48 +151,39 @@ export default function ExercisePage() {
     setResults({ correct: correctCount, total: trialResults.length });
     setPhase('complete');
 
-    // After completion, advance the Saccades training run counter (up to 15).
-    if (exerciseId === 'visual_saccades') {
-      const completedRaw = localStorage.getItem('saccadesTrainingRun');
-      const completed = Math.max(0, Number.parseInt(completedRaw || '0', 10) || 0);
-      localStorage.setItem('saccadesTrainingRun', String(Math.min(15, completed + 1)));
+    // Update server-side progress for auto-progression exercises
+    if (isAutoProgression) {
+      try {
+        const progressRes = await fetch('/api/exercise-progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            exercise_id: exerciseId,
+            correct_count: correctCount,
+            total_trials: trialResults.length,
+          }),
+        });
+        const progressData = await progressRes.json();
+        setServerLevel(progressData.current_level);
+      } catch {
+        // Fallback: also update localStorage for backwards compatibility
+        const keyMap: Record<string, string> = {
+          visual_saccades: 'saccadesTrainingRun',
+          visual_search: 'visualSearchTrainingLevel',
+          visual_memory: 'visualMemoryTrainingSession',
+          maze_tracking: 'mazeTrainingLevel',
+          line_tracking: 'lineTrackingLevel',
+          pair_search: 'pairSearchLevel',
+        };
+        const key = keyMap[exerciseId];
+        if (key) {
+          const raw = localStorage.getItem(key);
+          const current = Math.max(1, Number.parseInt(raw || '1', 10) || 1);
+          localStorage.setItem(key, String(Math.min(15, current + 1)));
+        }
+      }
     }
-
-    // After completion, advance the Visual Search training level (up to 15).
-    if (exerciseId === 'visual_search') {
-      const raw = localStorage.getItem('visualSearchTrainingLevel');
-      const current = Math.max(1, Number.parseInt(raw || '1', 10) || 1);
-      localStorage.setItem('visualSearchTrainingLevel', String(Math.min(15, current + 1)));
-    }
-
-    // After completion, advance the Visual Memory training session (up to 15).
-    if (exerciseId === 'visual_memory') {
-      const raw = localStorage.getItem('visualMemoryTrainingSession');
-      const current = Math.max(1, Number.parseInt(raw || '1', 10) || 1);
-      localStorage.setItem('visualMemoryTrainingSession', String(Math.min(15, current + 1)));
-    }
-
-    // After completion, advance the Maze training level (up to 15).
-    if (exerciseId === 'maze_tracking') {
-      const raw = localStorage.getItem('mazeTrainingLevel');
-      const current = Math.max(1, Number.parseInt(raw || '1', 10) || 1);
-      localStorage.setItem('mazeTrainingLevel', String(Math.min(15, current + 1)));
-    }
-
-    // After completion, advance the Line Tracking level (up to 15).
-    if (exerciseId === 'line_tracking') {
-      const raw = localStorage.getItem('lineTrackingLevel');
-      const current = Math.max(1, Number.parseInt(raw || '1', 10) || 1);
-      localStorage.setItem('lineTrackingLevel', String(Math.min(15, current + 1)));
-    }
-
-    // After completion, advance the Pair Search level (up to 15).
-    if (exerciseId === 'pair_search') {
-      const raw = localStorage.getItem('pairSearchLevel');
-      const current = Math.max(1, Number.parseInt(raw || '1', 10) || 1);
-      localStorage.setItem('pairSearchLevel', String(Math.min(15, current + 1)));
-    }
-  }, [exerciseRunId, exerciseId]);
+  }, [exerciseRunId, exerciseId, isAutoProgression]);
 
   // Handle exit
   const handleExit = () => {
@@ -211,9 +210,9 @@ export default function ExercisePage() {
           <p className="text-child-base text-slate-600 mb-6">
             {exerciseInfo.description}
           </p>
-          
+
           {/* Difficulty selector - hidden for exercises with auto-progression */}
-          {!['visual_saccades', 'visual_search', 'visual_memory', 'maze_tracking', 'line_tracking', 'pair_search'].includes(exerciseId) && (
+          {!isAutoProgression && (
             <div className="mb-8">
               <p className="text-sm text-slate-500 mb-3">Select Difficulty</p>
               <div className="flex justify-center gap-2">
@@ -223,8 +222,8 @@ export default function ExercisePage() {
                     onClick={() => setDifficulty(level)}
                     className={`
                       w-12 h-12 rounded-xl font-bold text-lg transition-all
-                      ${difficulty === level 
-                        ? 'bg-primary-500 text-white shadow-lg scale-110' 
+                      ${difficulty === level
+                        ? 'bg-primary-500 text-white shadow-lg scale-110'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}
                     `}
                   >
@@ -238,6 +237,13 @@ export default function ExercisePage() {
             </div>
           )}
 
+          {/* Show current level for auto-progression exercises */}
+          {isAutoProgression && serverLevel !== null && (
+            <p className="text-sm text-slate-500 mb-4">
+              Current Level: {serverLevel} / 15
+            </p>
+          )}
+
           <p className="text-slate-500 mb-8">
             {exerciseId === 'visual_saccades' ? '1 training run • Take your time!'
               : exerciseId === 'visual_search' ? '10 puzzles • Find the different one!'
@@ -247,9 +253,9 @@ export default function ExercisePage() {
               : exerciseId === 'pair_search' ? '1 puzzle • Find the matching shape!'
               : '10 trials • Take your time!'}
           </p>
-          
+
           <div className="flex flex-col gap-4">
-            <Button onClick={startExercise} size="xl">
+            <Button onClick={startExercise} size="xl" disabled={isAutoProgression && serverLevel === null}>
               Start!
             </Button>
             <Button onClick={handleExit} variant="ghost">

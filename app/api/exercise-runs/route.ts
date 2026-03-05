@@ -39,15 +39,28 @@ export async function PATCH(request: NextRequest) {
 
   const db = getDb();
   const body = await request.json();
-  const { exerciseRunId, correct_count, avg_reaction_time_ms } = body;
+  const { exerciseRunId, correct_count, avg_reaction_time_ms, metrics } = body;
 
   db.prepare(`
-    UPDATE exercise_runs 
+    UPDATE exercise_runs
     SET ended_at = datetime('now'),
         correct_count = ?,
         avg_reaction_time_ms = ?
     WHERE id = ?
   `).run(correct_count, avg_reaction_time_ms, exerciseRunId);
+
+  // Store exercise-specific metrics if provided
+  if (metrics && typeof metrics === 'object') {
+    const insertMetric = db.prepare(`
+      INSERT OR REPLACE INTO exercise_run_metrics (exercise_run_id, metric_key, metric_value)
+      VALUES (?, ?, ?)
+    `);
+    for (const [key, value] of Object.entries(metrics)) {
+      if (typeof value === 'number' && isFinite(value)) {
+        insertMetric.run(exerciseRunId, key, value);
+      }
+    }
+  }
 
   const exerciseRun = db.prepare('SELECT * FROM exercise_runs WHERE id = ?').get(exerciseRunId);
   return NextResponse.json({ exerciseRun });

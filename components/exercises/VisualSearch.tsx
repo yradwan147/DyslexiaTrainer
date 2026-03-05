@@ -187,8 +187,6 @@ export function VisualSearch({ config, currentTrialIndex, onTrialComplete }: Exe
         </span>
       </div>
 
-      <p className="text-slate-400 text-sm">{description}</p>
-
       {renderGrid()}
 
       {showSuccess && (

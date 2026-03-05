@@ -217,10 +217,6 @@ export function VisualSaccades({ config, currentTrialIndex, onTrialComplete }: E
           ).join(' | ')}
         </div>
       )}
-      
-      <p className="text-slate-400 text-sm">
-        Mouse changes color when hovering. Click to move the circle.
-      </p>
     </div>
   );
 }

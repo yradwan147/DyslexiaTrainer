@@ -89,11 +89,28 @@ function seedDemoData(): void {
         INSERT INTO study_exercises (study_id, exercise_id, exercise_version, difficulty_level, trial_count, display_order)
         VALUES (?, ?, ?, ?, ?, ?)
       `);
-      
+
       for (const ex of exercises) {
         insertExercise.run(studyId, ex.id, ex.version, ex.difficulty, ex.trials, ex.order);
       }
-      
+
+      // Also create a session template (v3 schema)
+      const templateResult = db.prepare(`
+        INSERT OR IGNORE INTO session_templates (study_id, template_number, label)
+        VALUES (?, 1, 'Default')
+      `).run(studyId);
+
+      if (templateResult.changes > 0) {
+        const templateId = templateResult.lastInsertRowid;
+        const insertTemplateEx = db.prepare(`
+          INSERT INTO session_template_exercises (template_id, exercise_id, exercise_version, trial_count, display_order)
+          VALUES (?, ?, ?, ?, ?)
+        `);
+        for (const ex of exercises) {
+          insertTemplateEx.run(templateId, ex.id, ex.version, ex.trials, ex.order);
+        }
+      }
+
       console.log('[DB] Demo study created with all exercises');
     }
     
@@ -145,6 +162,7 @@ export interface Study {
   end_date: string | null;
   target_sessions: number;
   session_duration_minutes: number;
+  sessions_per_day: number;
   is_locked: number;
   created_at: string;
 }
@@ -180,16 +198,59 @@ export interface Session {
 
 export interface ExerciseRun {
   id: number;
-  session_id: number;
+  user_id: number;
+  session_id: number | null;
   exercise_id: string;
   exercise_version: string;
   difficulty_level: number;
-  display_order: number;
   started_at: string | null;
   ended_at: string | null;
   total_trials: number | null;
   correct_count: number | null;
   avg_reaction_time_ms: number | null;
+}
+
+export interface ExerciseProgress {
+  id: number;
+  user_id: number;
+  study_id: number;
+  exercise_id: string;
+  current_level: number;
+  total_sessions_completed: number;
+  last_completed_at: string | null;
+}
+
+export interface ExerciseRunMetric {
+  id: number;
+  exercise_run_id: number;
+  metric_key: string;
+  metric_value: number;
+}
+
+export interface TransitionRuleRecord {
+  id: number;
+  study_id: number;
+  exercise_id: string;
+  advance_threshold: number;
+  regress_threshold: number;
+  min_trials_required: number;
+  max_level: number;
+}
+
+export interface SessionTemplate {
+  id: number;
+  study_id: number;
+  template_number: number;
+  label: string | null;
+}
+
+export interface SessionTemplateExercise {
+  id: number;
+  template_id: number;
+  exercise_id: string;
+  exercise_version: string;
+  trial_count: number;
+  display_order: number;
 }
 
 export interface Trial {

@@ -7,21 +7,22 @@ import { getExerciseConfig } from '@/lib/exercises/configGenerator';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StarRating } from '@/components/ui/Feedback';
+import { EXERCISE_NAMES, ExerciseId } from '@/lib/exercises/types';
 import type { ExerciseConfig, TrialResult } from '@/lib/exercises/types';
 
-interface StudyExercise {
-  id: number;
+interface SessionExercise {
   exercise_id: string;
   exercise_version: string;
-  difficulty_level: number;
   trial_count: number;
   display_order: number;
+  current_level: number;
 }
 
 interface ExerciseRunData {
   id: number;
   exercise_id: string;
   correct_count?: number;
+  total_trials?: number;
 }
 
 type SessionPhase = 'loading' | 'intro' | 'exercise' | 'transition' | 'complete';
@@ -32,30 +33,31 @@ export default function SessionPage() {
   const sessionId = Number(params.sessionId);
 
   const [phase, setPhase] = useState<SessionPhase>('loading');
-  const [exercises, setExercises] = useState<StudyExercise[]>([]);
+  const [exercises, setExercises] = useState<SessionExercise[]>([]);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [exerciseRuns, setExerciseRuns] = useState<ExerciseRunData[]>([]);
   const [currentExerciseRunId, setCurrentExerciseRunId] = useState<number | null>(null);
   const [currentConfig, setCurrentConfig] = useState<ExerciseConfig | null>(null);
   const [sessionStats, setSessionStats] = useState({ totalCorrect: 0, totalTrials: 0 });
+  const [templateLabel, setTemplateLabel] = useState<string | null>(null);
+  const [sessionNumber, setSessionNumber] = useState<number>(0);
 
-  // Fetch session exercises
+  // Fetch session exercises from API
   useEffect(() => {
     const fetchExercises = async () => {
       try {
-        // Get study exercises for this session
         const res = await fetch(`/api/sessions?sessionId=${sessionId}`);
         const data = await res.json();
-        
-        // For now, use default exercises - in full implementation, get from study config
-        const defaultExercises: StudyExercise[] = [
-          { id: 1, exercise_id: 'coherent_motion', exercise_version: '1.0.0', difficulty_level: 1, trial_count: 5, display_order: 1 },
-          { id: 2, exercise_id: 'visual_search', exercise_version: '1.0.0', difficulty_level: 1, trial_count: 5, display_order: 2 },
-          { id: 3, exercise_id: 'visual_memory', exercise_version: '1.0.0', difficulty_level: 1, trial_count: 3, display_order: 3 },
-          { id: 4, exercise_id: 'pair_search', exercise_version: '1.0.0', difficulty_level: 1, trial_count: 1, display_order: 4 },
-        ];
 
-        setExercises(defaultExercises);
+        if (data.exercises && data.exercises.length > 0) {
+          setExercises(data.exercises);
+        }
+        if (data.template_label) {
+          setTemplateLabel(data.template_label);
+        }
+        if (data.session) {
+          setSessionNumber(data.session.session_number);
+        }
         setPhase('intro');
       } catch (error) {
         console.error('Error fetching exercises:', error);
@@ -65,8 +67,12 @@ export default function SessionPage() {
     fetchExercises();
   }, [sessionId]);
 
+  const getExerciseName = (exerciseId: string): string => {
+    return EXERCISE_NAMES[exerciseId as ExerciseId] || exerciseId.replace(/_/g, ' ');
+  };
+
   // Start an exercise
-  const startExercise = useCallback(async (exercise: StudyExercise) => {
+  const startExercise = useCallback(async (exercise: SessionExercise) => {
     try {
       // Create exercise run record
       const res = await fetch('/api/exercise-runs', {
@@ -76,7 +82,7 @@ export default function SessionPage() {
           session_id: sessionId,
           exercise_id: exercise.exercise_id,
           exercise_version: exercise.exercise_version,
-          difficulty_level: exercise.difficulty_level,
+          difficulty_level: exercise.current_level,
           display_order: exercise.display_order,
           total_trials: exercise.trial_count,
         }),
@@ -85,12 +91,18 @@ export default function SessionPage() {
       const data = await res.json();
       setCurrentExerciseRunId(data.exerciseRun.id);
 
-      // Generate exercise config
+      // Generate exercise config using current_level from server
       const config = getExerciseConfig(
         exercise.exercise_id,
-        exercise.difficulty_level,
+        exercise.current_level,
         exercise.trial_count
       );
+
+      // For saccades, set training_run_index
+      if (exercise.exercise_id === 'visual_saccades') {
+        config.training_run_index = exercise.current_level;
+      }
+
       setCurrentConfig(config);
       setPhase('exercise');
     } catch (error) {
@@ -121,7 +133,24 @@ export default function SessionPage() {
         id: currentExerciseRunId,
         exercise_id: exercises[currentExerciseIndex].exercise_id,
         correct_count: correctCount,
+        total_trials: results.length,
       }]);
+    }
+
+    // Update exercise progress with transition logic
+    const currentExercise = exercises[currentExerciseIndex];
+    try {
+      await fetch('/api/exercise-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          exercise_id: currentExercise.exercise_id,
+          correct_count: correctCount,
+          total_trials: results.length,
+        }),
+      });
+    } catch {
+      // Non-critical, continue
     }
 
     setSessionStats(prev => ({
@@ -197,8 +226,14 @@ export default function SessionPage() {
           <h1 className="text-child-2xl font-bold text-slate-800 mb-4">
             Ready to Start?
           </h1>
+          {templateLabel && (
+            <p className="text-sm text-slate-400 mb-2">{templateLabel}</p>
+          )}
+          {sessionNumber > 0 && (
+            <p className="text-sm text-slate-400 mb-2">Session {sessionNumber}</p>
+          )}
           <p className="text-child-base text-slate-600 mb-4">
-            You have {exercises.length} exercises to complete today.
+            You have {exercises.length} exercises to complete.
           </p>
           <p className="text-slate-500 mb-8">
             Take your time and do your best!
@@ -207,6 +242,7 @@ export default function SessionPage() {
             <Button
               onClick={() => startExercise(exercises[0])}
               size="xl"
+              disabled={exercises.length === 0}
             >
               Let&apos;s Go!
             </Button>
@@ -248,7 +284,7 @@ export default function SessionPage() {
             {currentExerciseIndex + 1} of {exercises.length} exercises done
           </p>
           <p className="text-child-base text-slate-700 mb-8">
-            Next up: {nextExercise?.exercise_id.replace(/_/g, ' ')}
+            Next up: {nextExercise ? getExerciseName(nextExercise.exercise_id) : ''}
           </p>
           <Button
             onClick={handleNextExercise}
@@ -297,4 +333,3 @@ export default function SessionPage() {
 
   return null;
 }
-

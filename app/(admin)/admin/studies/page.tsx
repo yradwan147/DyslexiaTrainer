@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -29,6 +30,7 @@ interface Study {
 const ALL_EXERCISES = Object.keys(EXERCISE_NAMES) as ExerciseId[];
 
 export default function StudiesPage() {
+  const router = useRouter();
   const [studies, setStudies] = useState<Study[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -37,6 +39,7 @@ export default function StudiesPage() {
     description: '',
     target_sessions: '15',
     session_duration_minutes: '30',
+    sessions_per_day: '1',
   });
   const [selectedExercises, setSelectedExercises] = useState<{
     exercise_id: string;
@@ -96,9 +99,11 @@ export default function StudiesPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
+          name: formData.name,
+          description: formData.description,
           target_sessions: parseInt(formData.target_sessions),
           session_duration_minutes: parseInt(formData.session_duration_minutes),
+          sessions_per_day: parseInt(formData.sessions_per_day),
           exercises,
         }),
       });
@@ -110,6 +115,7 @@ export default function StudiesPage() {
           description: '',
           target_sessions: '15',
           session_duration_minutes: '30',
+          sessions_per_day: '1',
         });
         setSelectedExercises([]);
         fetchData();
@@ -179,16 +185,24 @@ export default function StudiesPage() {
                   </div>
                   <p className="text-slate-600">{study.description || 'No description'}</p>
                 </div>
-                <button
-                  onClick={() => toggleLock(study.id, study.is_locked)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                    study.is_locked
-                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                      : 'bg-warning-100 hover:bg-warning-200 text-warning-600'
-                  }`}
-                >
-                  {study.is_locked ? 'Unlock' : 'Lock Study'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => router.push(`/admin/studies/${study.id}`)}
+                    className="px-4 py-2 rounded-xl text-sm font-medium bg-primary-100 hover:bg-primary-200 text-primary-600 transition-colors"
+                  >
+                    Configure
+                  </button>
+                  <button
+                    onClick={() => toggleLock(study.id, study.is_locked)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                      study.is_locked
+                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                        : 'bg-warning-100 hover:bg-warning-200 text-warning-600'
+                    }`}
+                  >
+                    {study.is_locked ? 'Unlock' : 'Lock Study'}
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4 mb-4">
@@ -249,12 +263,18 @@ export default function StudiesPage() {
               placeholder="Study description..."
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <Input
               label="Target Sessions"
               type="number"
               value={formData.target_sessions}
               onChange={(e) => setFormData({ ...formData, target_sessions: e.target.value })}
+            />
+            <Input
+              label="Sessions/Day"
+              type="number"
+              value={formData.sessions_per_day}
+              onChange={(e) => setFormData({ ...formData, sessions_per_day: e.target.value })}
             />
             <Input
               label="Duration (min)"

@@ -30,6 +30,7 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
   const currentRoundRef = useRef(0);
   const showFeedbackRef = useRef<'hit' | 'miss' | null>(null);
   const ballRef = useRef<Ball | null>(null);
+  const gameStartedRef = useRef(false);
   
   // State only for display updates
   const [displayHits, setDisplayHits] = useState(0);
@@ -81,6 +82,14 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
 
   // Handle click
   const handleClick = useCallback(() => {
+    // First click starts the game
+    if (!gameStartedRef.current) {
+      gameStartedRef.current = true;
+      ballRef.current = createBall();
+      startTimeRef.current = Date.now();
+      return;
+    }
+
     const ball = ballRef.current;
     if (!ball || !ball.active || showFeedbackRef.current) return;
     
@@ -147,8 +156,9 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
     missesRef.current = 0;
     currentRoundRef.current = 0;
     showFeedbackRef.current = null;
-    ballRef.current = createBall();
-    
+    gameStartedRef.current = false;
+    ballRef.current = null;
+
     // Reset display state
     setDisplayHits(0);
     setDisplayMisses(0);
@@ -156,10 +166,21 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
 
     const animate = () => {
       const ball = ballRef.current;
-      
+
       // Clear canvas
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(0, 0, width, height);
+
+      // Show "Click to Start" if game hasn't started
+      if (!gameStartedRef.current) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Click to Start', width / 2, height / 2);
+        ctx.textAlign = 'left';
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
 
       // Draw field lines
       ctx.strokeStyle = '#ffffff20';
@@ -338,10 +359,6 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
         <span className="text-green-400">Goals: {displayHits}</span>
         <span className="text-red-400">Misses: {displayMisses}</span>
       </div>
-      
-      <p className="text-slate-400 text-sm">
-        Click anywhere when the ball is inside the goal area
-      </p>
     </div>
   );
 }

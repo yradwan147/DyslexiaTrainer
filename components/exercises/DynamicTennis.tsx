@@ -27,9 +27,11 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
   const missesRef = useRef(0);
   const currentRoundRef = useRef(0);
   const showFeedbackRef = useRef<'hit' | 'miss' | null>(null);
+  const feedbackPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const ballRef = useRef<Ball | null>(null);
   const paddleXRef = useRef(0.5);
   const keysRef = useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
+  const gameStartedRef = useRef(false);
   
   // State for display only
   const [displayHits, setDisplayHits] = useState(0);
@@ -65,23 +67,29 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
   // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // First keypress starts the game
+      if (!gameStartedRef.current) {
+        gameStartedRef.current = true;
+        ballRef.current = createBall();
+        startTimeRef.current = Date.now();
+      }
       if (e.key === 'ArrowLeft') keysRef.current.left = true;
       if (e.key === 'ArrowRight') keysRef.current.right = true;
     };
-    
+
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') keysRef.current.left = false;
       if (e.key === 'ArrowRight') keysRef.current.right = false;
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, []);
+  }, [createBall]);
 
   // Animation loop
   useEffect(() => {
@@ -98,8 +106,9 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
     currentRoundRef.current = 0;
     showFeedbackRef.current = null;
     paddleXRef.current = 0.5;
-    ballRef.current = createBall();
-    
+    gameStartedRef.current = false;
+    ballRef.current = null;
+
     setDisplayHits(0);
     setDisplayMisses(0);
     setDisplayRound(0);
@@ -108,7 +117,7 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
 
     const animate = () => {
       const ball = ballRef.current;
-      
+
       // Update paddle position based on arrow keys
       if (keysRef.current.left) {
         paddleXRef.current = Math.max(actualPaddleWidth / 2 / width, paddleXRef.current - PADDLE_SPEED / width);
@@ -116,10 +125,28 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
       if (keysRef.current.right) {
         paddleXRef.current = Math.min(1 - actualPaddleWidth / 2 / width, paddleXRef.current + PADDLE_SPEED / width);
       }
-      
+
       // Clear canvas
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(0, 0, width, height);
+
+      // Show "Press any key to start" if game hasn't started
+      if (!gameStartedRef.current) {
+        // Still draw paddle
+        const paddleX = paddleXRef.current * width;
+        ctx.fillStyle = '#22c55e';
+        ctx.fillRect(paddleX - actualPaddleWidth / 2, paddleY, actualPaddleWidth, PADDLE_HEIGHT);
+        ctx.fillStyle = '#4ade80';
+        ctx.fillRect(paddleX - actualPaddleWidth / 2, paddleY, actualPaddleWidth, 4);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Press any key to start', width / 2, height / 2);
+        ctx.textAlign = 'left';
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
 
       // Draw court lines
       ctx.strokeStyle = '#475569';
@@ -164,6 +191,7 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
             hitsRef.current++;
             setDisplayHits(hitsRef.current);
             showFeedbackRef.current = 'hit';
+            feedbackPosRef.current = { x: ball.x, y: ball.y };
             
             feedbackTimeout = setTimeout(() => {
               showFeedbackRef.current = null;
@@ -198,6 +226,7 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
           missesRef.current++;
           setDisplayMisses(missesRef.current);
           showFeedbackRef.current = 'miss';
+          feedbackPosRef.current = { x: ball.x, y: Math.min(ball.y, height - 30) };
           
           feedbackTimeout = setTimeout(() => {
             showFeedbackRef.current = null;
@@ -226,16 +255,36 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
         }
       }
 
-      // Draw ball
+      // Draw ball with feedback-aware colors
       if (ball) {
-        ctx.fillStyle = '#fbbf24';
+        const isHitFeedback = showFeedbackRef.current === 'hit';
+        const isMissFeedback = showFeedbackRef.current === 'miss';
+
+        const ballColor = isHitFeedback ? '#22c55e' : isMissFeedback ? '#ef4444' : '#fbbf24';
+        const strokeColor = isHitFeedback ? '#16a34a' : isMissFeedback ? '#dc2626' : '#f59e0b';
+
+        ctx.fillStyle = ballColor;
         ctx.beginPath();
         ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
         ctx.fill();
-        
-        ctx.strokeStyle = '#f59e0b';
+
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 2;
         ctx.stroke();
+      }
+
+      // Draw small feedback text near ball area (no full-screen flash)
+      if (showFeedbackRef.current) {
+        const fbPos = feedbackPosRef.current;
+        ctx.fillStyle = showFeedbackRef.current === 'hit' ? '#22c55e' : '#ef4444';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+          showFeedbackRef.current === 'hit' ? 'HIT!' : 'MISS!',
+          fbPos.x,
+          fbPos.y - 30
+        );
+        ctx.textAlign = 'left';
       }
 
       // Draw score
@@ -244,17 +293,6 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
       ctx.fillText(`Round: ${currentRoundRef.current + 1} / ${TOTAL_ROUNDS}`, 20, 30);
       ctx.fillText(`Hits: ${hitsRef.current}`, 20, 55);
       ctx.fillText(`Level ${difficulty}`, width - 100, 30);
-
-      // Feedback overlay
-      if (showFeedbackRef.current) {
-        ctx.fillStyle = showFeedbackRef.current === 'hit' ? '#22c55e80' : '#ef444480';
-        ctx.fillRect(0, 0, width, height);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 48px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(showFeedbackRef.current === 'hit' ? 'HIT!' : 'MISS!', width / 2, height / 2);
-        ctx.textAlign = 'left';
-      }
 
       animationRef.current = requestAnimationFrame(animate);
     };
@@ -295,10 +333,6 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
         <span className="text-green-400">Hits: {displayHits}</span>
         <span className="text-red-400">Misses: {displayMisses}</span>
       </div>
-      
-      <p className="text-slate-400 text-sm">
-        Use ← and → arrow keys to move the paddle
-      </p>
     </div>
   );
 }

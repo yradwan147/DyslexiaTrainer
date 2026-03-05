@@ -212,12 +212,11 @@ export function getMemoryImagePath(name: string): string {
   return `/assets/visual-memory/${name}.png`;
 }
 
-// Get all unique items for the selection grid (sequence items + distractors from same session)
+// Get exactly 16 unique items for a 4x4 selection grid (sequence items + distractors)
 export function getAllUniqueItems(sequence: MemorySequence, session: MemorySession): string[] {
-  const allItems = new Set<string>();
-
-  // Add sequence items
-  sequence.sequence.forEach((item) => allItems.add(item));
+  const TARGET_COUNT = 16;
+  const correctItems = new Set<string>(sequence.sequence);
+  const allItems = new Set<string>(sequence.sequence);
 
   // Add distractors from other sequences in the same session
   for (const seq of session.sequences) {
@@ -225,8 +224,33 @@ export function getAllUniqueItems(sequence: MemorySequence, session: MemorySessi
     seq.sequence.forEach((item) => allItems.add(item));
   }
 
+  // If we still need more items, pull from other sessions
+  if (allItems.size < TARGET_COUNT) {
+    for (const otherSession of MEMORY_SESSIONS) {
+      if (otherSession.sessionNumber === session.sessionNumber) continue;
+      for (const seq of otherSession.sequences) {
+        seq.sequence.forEach((item) => allItems.add(item));
+        if (allItems.size >= TARGET_COUNT) break;
+      }
+      if (allItems.size >= TARGET_COUNT) break;
+    }
+  }
+
+  let arr = Array.from(allItems);
+
+  // Trim to TARGET_COUNT if needed, but always keep correct answers
+  if (arr.length > TARGET_COUNT) {
+    const correct = arr.filter((item) => correctItems.has(item));
+    const distractors = arr.filter((item) => !correctItems.has(item));
+    // Shuffle distractors before trimming
+    for (let i = distractors.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [distractors[i], distractors[j]] = [distractors[j], distractors[i]];
+    }
+    arr = [...correct, ...distractors.slice(0, TARGET_COUNT - correct.length)];
+  }
+
   // Shuffle using Fisher-Yates
-  const arr = Array.from(allItems);
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
