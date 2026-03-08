@@ -134,7 +134,7 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
       </p>
 
       {/* Main layout: [left labels] [image] [right buttons] */}
-      <div className="flex items-start gap-2 w-full justify-center" style={{ maxWidth: '95vw' }}>
+      <div className="flex items-start gap-2 w-full justify-center">
         {/* Left side: positioned labels */}
         <div className="relative flex-shrink-0" style={{ width: BUTTON_SIZE, minHeight: imageHeight || 200 }}>
           {Array.from({ length: itemCount }, (_, idx) => {
@@ -161,18 +161,17 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
           })}
         </div>
 
-        {/* Center: puzzle image - stretched to fill */}
+        {/* Center: puzzle image - fills available space */}
         <div
           ref={imageContainerRef}
           className="bg-white rounded-xl shadow-lg overflow-hidden flex-1"
-          style={{ maxWidth: '80%' }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             ref={imageRef}
             src={getLineTrackingImagePath(imageFile)}
             alt={`Line tracking puzzle ${level}`}
-            style={{ width: '100%', height: 'auto', display: 'block' }}
+            style={{ width: '100%', height: 'auto', maxHeight: 'calc(100vh - 240px)', objectFit: 'contain', display: 'block' }}
             draggable={false}
           />
         </div>

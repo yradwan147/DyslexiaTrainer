@@ -112,7 +112,18 @@ export function VisualSearch({ config, currentTrialIndex, onTrialComplete }: Exe
   );
 
   // Responsive cell size for fullscreen
-  const cellSize = Math.min(70, Math.floor(520 / gridSize));
+  const [availableSpace, setAvailableSpace] = useState(520);
+  useEffect(() => {
+    const updateSpace = () => {
+      const vw = window.innerWidth - 80;
+      const vh = window.innerHeight - 280;
+      setAvailableSpace(Math.max(200, Math.min(vw, vh)));
+    };
+    updateSpace();
+    window.addEventListener('resize', updateSpace);
+    return () => window.removeEventListener('resize', updateSpace);
+  }, []);
+  const cellSize = Math.min(80, Math.floor(availableSpace / gridSize));
 
   const renderGrid = () => {
     const cells = [];
@@ -189,15 +200,17 @@ export function VisualSearch({ config, currentTrialIndex, onTrialComplete }: Exe
 
       {renderGrid()}
 
-      {showSuccess && (
-        <div className="text-green-400 text-xl font-bold animate-pulse">
-          {totalDifferent === 0 ? '✓ Correct!' : 'Found it!'}
-        </div>
-      )}
-
-      {wrongClicks.size > 0 && !showSuccess && (
-        <div className="text-slate-500 text-sm">Keep looking...</div>
-      )}
+      {/* Fixed-height feedback area to prevent layout shifts */}
+      <div className="h-8 flex items-center justify-center">
+        {showSuccess && (
+          <div className="text-green-400 text-xl font-bold animate-pulse">
+            {totalDifferent === 0 ? '✓ Correct!' : 'Found it!'}
+          </div>
+        )}
+        {wrongClicks.size > 0 && !showSuccess && (
+          <div className="text-slate-500 text-sm">Keep looking...</div>
+        )}
+      </div>
     </div>
   );
 }

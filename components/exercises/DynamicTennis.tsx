@@ -38,9 +38,25 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
   const [displayMisses, setDisplayMisses] = useState(0);
   const [displayRound, setDisplayRound] = useState(0);
 
-  const width = 700;
-  const height = 500;
-  const paddleY = height - 40;
+  // Responsive canvas sizing
+  const [canvasSize, setCanvasSize] = useState({ width: 700, height: 500 });
+  const sizeRef = useRef({ width: 700, height: 500 });
+
+  useEffect(() => {
+    const updateSize = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const size = {
+        width: Math.max(400, Math.min(vw - 40, 1200)),
+        height: Math.max(300, vh - 200),
+      };
+      sizeRef.current = size;
+      setCanvasSize(size);
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
 
   // Speed based on difficulty (1-5)
   const difficulty = config.difficulty_level || 1;
@@ -52,9 +68,10 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
 
   // Create a new ball
   const createBall = useCallback((): Ball => {
+    const { width } = sizeRef.current;
     const startX = Math.random() * (width - 100) + 50;
     const startY = 50;
-    
+
     return {
       x: startX,
       y: startY,
@@ -62,7 +79,7 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
       vy: baseSpeed,
       active: true,
     };
-  }, [baseSpeed, width]);
+  }, [baseSpeed]);
 
   // Keyboard controls
   useEffect(() => {
@@ -117,6 +134,14 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
 
     const animate = () => {
       const ball = ballRef.current;
+      const { width, height } = sizeRef.current;
+      const paddleY = height - 40;
+
+      // Sync canvas buffer size with current dimensions
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
 
       // Update paddle position based on arrow keys
       if (keysRef.current.left) {
@@ -175,7 +200,7 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
           ball.vx = -ball.vx;
           ball.x = Math.max(BALL_RADIUS, Math.min(width - BALL_RADIUS, ball.x));
         }
-        
+
         // Bounce off top
         if (ball.y <= BALL_RADIUS) {
           ball.vy = Math.abs(ball.vy);
@@ -322,8 +347,8 @@ export function DynamicTennis({ config, currentTrialIndex, onTrialComplete }: Ex
       
       <canvas
         ref={canvasRef}
-        width={width}
-        height={height}
+        width={canvasSize.width}
+        height={canvasSize.height}
         className="rounded-2xl border-2 border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500"
         tabIndex={0}
         autoFocus

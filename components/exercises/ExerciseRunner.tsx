@@ -269,8 +269,8 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
         </div>
       </div>
 
-      {/* Exercise area -- fills remaining space, scrolls if needed */}
-      <div className="flex-1 min-h-0 flex items-center justify-center p-2 overflow-y-auto">
+      {/* Exercise area -- fills remaining space */}
+      <div className="flex-1 min-h-0 flex items-center justify-center p-2 overflow-hidden">
         {phase === 'feedback' ? (
           <Feedback 
             type={feedbackType} 

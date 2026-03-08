@@ -29,8 +29,25 @@ export function VisualSaccades({ config, currentTrialIndex, onTrialComplete }: E
   const level = config.difficulty_level || 1;
   const trainingRunIndex = config.training_run_index ?? level;
   const circleRadius = getCircleRadius(trainingRunIndex);
-  const width = 800;
-  const height = 500;
+
+  // Responsive canvas sizing
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 500 });
+  const width = canvasSize.width;
+  const height = canvasSize.height;
+
+  useEffect(() => {
+    const updateSize = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      setCanvasSize({
+        width: Math.max(400, Math.min(vw - 40, 1200)),
+        height: Math.max(300, vh - 200),
+      });
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
 
   // Generate random position ensuring it's within bounds
   const generateRandomPosition = useCallback(() => {

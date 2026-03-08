@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import type { ExerciseProps } from '@/lib/exercises/types';
 import {
-  getMazeConfig,
+  generateMazeConfig,
   getPlayerImagePath,
   getObjectImagePath,
   type MazeConfig,
@@ -11,7 +11,15 @@ import {
 
 export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: ExerciseProps) {
   const level = Math.max(1, Math.min(15, config.difficulty_level || 1));
-  const mazeConfig: MazeConfig = getMazeConfig(level);
+
+  // Unique session seed so each trial gets a different maze
+  const sessionSeed = useMemo(() => Math.floor(Date.now() + Math.random() * 1000000), []);
+
+  // Generate a fresh maze per trial using a trial-specific seed
+  const mazeConfig: MazeConfig = useMemo(
+    () => generateMazeConfig(level, sessionSeed + currentTrialIndex * 7919),
+    [level, sessionSeed, currentTrialIndex],
+  );
   const { grid_size, grid, player, objects, object_count, maze_id, reachable_count } = mazeConfig;
 
   const [collectedSet, setCollectedSet] = useState<Set<number>>(new Set());
@@ -28,12 +36,15 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
     startTimeRef.current = Date.now();
   }, [currentTrialIndex]);
 
+  const [availableWidth, setAvailableWidth] = useState(600);
+
   // Measure available space to size the maze dynamically
   useEffect(() => {
     const measure = () => {
-      // Estimate available height: viewport minus header/status (~160px)
       const vh = window.innerHeight - 180;
+      const vw = window.innerWidth - 120;
       setAvailableHeight(Math.max(300, vh));
+      setAvailableWidth(Math.max(300, vw));
     };
     measure();
     window.addEventListener('resize', measure);
@@ -83,9 +94,9 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
     [isComplete, collectedSet, objects, reachable_count, handleComplete],
   );
 
-  // Dynamic cell size: fit maze into available height (with padding for the outer border visibility)
+  // Dynamic cell size: fit maze into available space (with padding for the outer border visibility)
   const padding = 12; // px padding around the maze grid
-  const maxMazePx = Math.min(availableHeight - 20, 600);
+  const maxMazePx = Math.min(availableHeight - 20, availableWidth);
   const cellSize = Math.floor(maxMazePx / grid_size);
   const mazePixelSize = cellSize * grid_size;
 

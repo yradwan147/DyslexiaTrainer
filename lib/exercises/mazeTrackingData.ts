@@ -254,15 +254,16 @@ function generateMazeGrid(corridors: number, seed: number): string[][] {
   return grid;
 }
 
-// Generate full maze config for a given level
-function generateMazeConfig(id: number): MazeConfig {
+// Generate full maze config for a given level.
+// Optional customSeed overrides the default deterministic seed to produce varied mazes.
+export function generateMazeConfig(id: number, customSeed?: number): MazeConfig {
   const [totalObjects, correctCount] = MAZE_OBJECT_RULES[id] ?? [5, 4];
 
   // Size: mazes 1-5 use 19x19 (9 corridors), mazes 6-15 use 25x25 (12 corridors)
   const corridors = id <= 5 ? 9 : 12;
   const size = 2 * corridors + 1;
 
-  const seed = 42 + id * 1000; // Deterministic per maze
+  const seed = customSeed ?? (42 + id * 1000); // Deterministic per maze, or custom for variety
   const rng = createSeededRandom(seed);
 
   const grid = generateMazeGrid(corridors, seed);

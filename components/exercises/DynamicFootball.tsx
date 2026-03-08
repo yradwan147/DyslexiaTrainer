@@ -37,10 +37,25 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
   const [displayMisses, setDisplayMisses] = useState(0);
   const [displayRound, setDisplayRound] = useState(0);
 
-  const width = 700;
-  const height = 500;
-  const goalX = (width - GOAL_WIDTH) / 2;
-  const goalY = height - GOAL_HEIGHT - 10;
+  // Responsive canvas sizing
+  const [canvasSize, setCanvasSize] = useState({ width: 700, height: 500 });
+  const sizeRef = useRef({ width: 700, height: 500 });
+
+  useEffect(() => {
+    const updateSize = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const size = {
+        width: Math.max(400, Math.min(vw - 40, 1200)),
+        height: Math.max(300, vh - 200),
+      };
+      sizeRef.current = size;
+      setCanvasSize(size);
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
 
   // Speed based on difficulty (1-5) - exponential scaling for harder high levels
   const difficulty = config.difficulty_level || 1;
@@ -51,17 +66,19 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
 
   // Create a new ball - uses parametric path from top to goal center
   const createBall = useCallback((): Ball => {
+    const { width, height } = sizeRef.current;
+    const goalX = (width - GOAL_WIDTH) / 2;
+    const goalY = height - GOAL_HEIGHT - 10;
     // Start from random position at top
     const startX = 80 + Math.random() * (width - 160);
     const startY = 20 + Math.random() * 30;
-    
+
     // End point is ALWAYS inside the goal center area
-    // Small random offset to add some variety (max ±40px from center in a 150px goal)
     const goalCenterX = goalX + GOAL_WIDTH / 2;
     const goalCenterY = goalY + GOAL_HEIGHT / 2;
     const endX = goalCenterX + (Math.random() - 0.5) * 60;
     const endY = goalCenterY;
-    
+
     return {
       startX,
       startY,
@@ -71,7 +88,7 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
       speed: ballSpeed,
       active: true,
     };
-  }, [ballSpeed, goalX, goalY, width]);
+  }, [ballSpeed]);
 
   // Get current ball position based on progress
   const getBallPosition = useCallback((ball: Ball) => {
@@ -92,10 +109,13 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
 
     const ball = ballRef.current;
     if (!ball || !ball.active || showFeedbackRef.current) return;
-    
+
     const { x, y } = getBallPosition(ball);
-    
+
     // Check if ball is inside the full (visible) goal area, including posts/crossbar region.
+    const { width, height } = sizeRef.current;
+    const goalX = (width - GOAL_WIDTH) / 2;
+    const goalY = height - GOAL_HEIGHT - 10;
     const goalHitboxX = goalX - 5;
     const goalHitboxY = goalY - GOAL_POST_EXTENSION;
     const goalHitboxW = GOAL_WIDTH + 10;
@@ -140,7 +160,7 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
         ballRef.current = createBall();
       }
     }, 800);
-  }, [goalX, goalY, currentTrialIndex, onTrialComplete, createBall, difficulty, getBallPosition]);
+  }, [currentTrialIndex, onTrialComplete, createBall, difficulty, getBallPosition]);
 
   // Animation loop - only depends on stable values
   useEffect(() => {
@@ -166,6 +186,15 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
 
     const animate = () => {
       const ball = ballRef.current;
+      const { width, height } = sizeRef.current;
+      const goalX = (width - GOAL_WIDTH) / 2;
+      const goalY = height - GOAL_HEIGHT - 10;
+
+      // Sync canvas buffer size with current dimensions
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
 
       // Clear canvas
       ctx.fillStyle = '#1e293b';
@@ -195,15 +224,14 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
 
       // Draw goal at bottom center
       ctx.fillStyle = '#22c55e';
-      // Full goal area (match hitbox)
       ctx.fillRect(goalX - 5, goalY - GOAL_POST_EXTENSION, GOAL_WIDTH + 10, GOAL_HEIGHT + GOAL_POST_EXTENSION);
-      
+
       // Goal posts
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(goalX - 5, goalY - GOAL_POST_EXTENSION, 10, GOAL_HEIGHT + GOAL_POST_EXTENSION);
       ctx.fillRect(goalX + GOAL_WIDTH - 5, goalY - GOAL_POST_EXTENSION, 10, GOAL_HEIGHT + GOAL_POST_EXTENSION);
       ctx.fillRect(goalX - 5, goalY - GOAL_POST_EXTENSION, GOAL_WIDTH + 10, 8);
-      
+
       // Goal net pattern
       ctx.strokeStyle = '#ffffff40';
       ctx.lineWidth = 1;
@@ -349,8 +377,8 @@ export function DynamicFootball({ config, currentTrialIndex, onTrialComplete }: 
       
       <canvas
         ref={canvasRef}
-        width={width}
-        height={height}
+        width={canvasSize.width}
+        height={canvasSize.height}
         onClick={handleClick}
         className="rounded-2xl cursor-pointer border-2 border-slate-600"
       />
