@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS studies (
   target_sessions INTEGER DEFAULT 15,
   session_duration_minutes INTEGER DEFAULT 30,
   sessions_per_day INTEGER DEFAULT 1,
+  sessions_per_week INTEGER DEFAULT NULL,
+  min_days_between_sessions INTEGER DEFAULT NULL,
   is_locked INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

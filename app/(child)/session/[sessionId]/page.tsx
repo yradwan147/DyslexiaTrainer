@@ -117,27 +117,31 @@ export default function SessionPage() {
       ? results.reduce((sum, r) => sum + r.response_time_ms, 0) / results.length
       : 0;
 
-    // Update exercise run with results
-    if (currentExerciseRunId) {
-      await fetch('/api/exercise-runs', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          exerciseRunId: currentExerciseRunId,
-          correct_count: correctCount,
-          avg_reaction_time_ms: avgReactionTime,
-        }),
-      });
+    // Update exercise run with results (non-critical)
+    try {
+      if (currentExerciseRunId) {
+        await fetch('/api/exercise-runs', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            exerciseRunId: currentExerciseRunId,
+            correct_count: correctCount,
+            avg_reaction_time_ms: avgReactionTime,
+          }),
+        });
 
-      setExerciseRuns(prev => [...prev, {
-        id: currentExerciseRunId,
-        exercise_id: exercises[currentExerciseIndex].exercise_id,
-        correct_count: correctCount,
-        total_trials: results.length,
-      }]);
+        setExerciseRuns(prev => [...prev, {
+          id: currentExerciseRunId,
+          exercise_id: exercises[currentExerciseIndex].exercise_id,
+          correct_count: correctCount,
+          total_trials: results.length,
+        }]);
+      }
+    } catch {
+      // Non-critical, continue to next exercise
     }
 
-    // Update exercise progress with transition logic
+    // Update exercise progress with transition logic (non-critical)
     const currentExercise = exercises[currentExerciseIndex];
     try {
       await fetch('/api/exercise-progress', {
@@ -163,34 +167,30 @@ export default function SessionPage() {
       setPhase('transition');
     } else {
       // Complete session
-      await fetch('/api/sessions', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          status: 'completed',
-        }),
-      });
+      try {
+        await fetch('/api/sessions', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId,
+            status: 'completed',
+          }),
+        });
+      } catch {
+        // Non-critical
+      }
       setPhase('complete');
     }
   }, [currentExerciseRunId, currentExerciseIndex, exercises, sessionId]);
 
   // Handle transition to next exercise
   const handleNextExercise = useCallback(() => {
-    setCurrentExerciseIndex(prev => prev + 1);
+    const nextIndex = currentExerciseIndex + 1;
+    setCurrentExerciseIndex(nextIndex);
     setCurrentConfig(null);
     setCurrentExerciseRunId(null);
-  }, []);
-
-  // Start next exercise when index changes
-  useEffect(() => {
-    if (phase === 'transition' || (phase === 'intro' && currentExerciseIndex > 0)) {
-      const nextExercise = exercises[currentExerciseIndex];
-      if (nextExercise) {
-        startExercise(nextExercise);
-      }
-    }
-  }, [currentExerciseIndex, exercises, phase, startExercise]);
+    startExercise(exercises[nextIndex]);
+  }, [currentExerciseIndex, exercises, startExercise]);
 
   // Handle exit
   const handleExit = async () => {

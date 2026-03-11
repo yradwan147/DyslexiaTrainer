@@ -34,7 +34,7 @@ export interface PerformanceData {
 const DEFAULT_ADVANCE_THRESHOLD = 0.8;
 const DEFAULT_REGRESS_THRESHOLD = 0.5;
 const DEFAULT_MAX_LEVEL = 15;
-const DEFAULT_MIN_TRIALS = 5;
+const DEFAULT_MIN_TRIALS = 1;
 
 export function evaluateTransition(performance: PerformanceData): TransitionResult {
   const { correctCount, totalTrials, currentLevel, rule } = performance;

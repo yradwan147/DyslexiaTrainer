@@ -40,6 +40,8 @@ export default function StudiesPage() {
     target_sessions: '15',
     session_duration_minutes: '30',
     sessions_per_day: '1',
+    sessions_per_week: '',
+    min_days_between_sessions: '',
   });
   const [selectedExercises, setSelectedExercises] = useState<{
     exercise_id: string;
@@ -104,6 +106,8 @@ export default function StudiesPage() {
           target_sessions: parseInt(formData.target_sessions),
           session_duration_minutes: parseInt(formData.session_duration_minutes),
           sessions_per_day: parseInt(formData.sessions_per_day),
+          sessions_per_week: formData.sessions_per_week ? parseInt(formData.sessions_per_week) : null,
+          min_days_between_sessions: formData.min_days_between_sessions ? parseInt(formData.min_days_between_sessions) : null,
           exercises,
         }),
       });
@@ -116,6 +120,8 @@ export default function StudiesPage() {
           target_sessions: '15',
           session_duration_minutes: '30',
           sessions_per_day: '1',
+          sessions_per_week: '',
+          min_days_between_sessions: '',
         });
         setSelectedExercises([]);
         fetchData();
@@ -281,6 +287,22 @@ export default function StudiesPage() {
               type="number"
               value={formData.session_duration_minutes}
               onChange={(e) => setFormData({ ...formData, session_duration_minutes: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Sessions/Week (optional)"
+              type="number"
+              value={formData.sessions_per_week}
+              onChange={(e) => setFormData({ ...formData, sessions_per_week: e.target.value })}
+              placeholder="No limit"
+            />
+            <Input
+              label="Min Days Between Sessions (optional)"
+              type="number"
+              value={formData.min_days_between_sessions}
+              onChange={(e) => setFormData({ ...formData, min_days_between_sessions: e.target.value })}
+              placeholder="No minimum"
             />
           </div>
 

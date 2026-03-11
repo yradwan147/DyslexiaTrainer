@@ -40,6 +40,20 @@ export function initializeDatabase(): void {
     db.exec(schema);
     console.log('[DB] Schema initialized');
   }
+
+  // Migrations for new columns (safe to re-run; ALTER throws if column already exists)
+  const migrations: [string, string][] = [
+    ['sessions_per_week', 'ALTER TABLE studies ADD COLUMN sessions_per_week INTEGER DEFAULT NULL'],
+    ['min_days_between_sessions', 'ALTER TABLE studies ADD COLUMN min_days_between_sessions INTEGER DEFAULT NULL'],
+  ];
+  for (const [name, sql] of migrations) {
+    try {
+      db.exec(sql);
+      console.log(`[DB] Migration applied: ${name}`);
+    } catch {
+      // Column already exists — expected on subsequent runs
+    }
+  }
 }
 
 // Seed demo data if it doesn't exist

@@ -31,9 +31,14 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
   const [showFeedback, setShowFeedback] = useState<boolean | null>(null);
   const [trialCount, setTrialCount] = useState(0);
   const [currentCoherence, setCurrentCoherence] = useState(INITIAL_COHERENCE);
-  const [canvasSize, setCanvasSize] = useState<{ width: number; height: number }>({
-    width: 900,
-    height: 500,
+  const [canvasSize, setCanvasSize] = useState<{ width: number; height: number }>(() => {
+    if (typeof window !== 'undefined') {
+      return {
+        width: Math.max(400, Math.min(window.innerWidth - 40, 1200)),
+        height: Math.max(250, window.innerHeight - 320),
+      };
+    }
+    return { width: 900, height: 500 };
   });
 
   const trial = config.trials[currentTrialIndex] as CoherentMotionTrialConfig;

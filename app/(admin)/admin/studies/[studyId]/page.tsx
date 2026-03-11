@@ -50,6 +50,8 @@ interface StudyData {
   description: string | null;
   target_sessions: number;
   sessions_per_day: number;
+  sessions_per_week: number | null;
+  min_days_between_sessions: number | null;
   session_duration_minutes: number;
   is_locked: number;
 }
@@ -72,6 +74,8 @@ export default function StudyDetailPage() {
   const [editDescription, setEditDescription] = useState('');
   const [editTargetSessions, setEditTargetSessions] = useState('15');
   const [editSessionsPerDay, setEditSessionsPerDay] = useState('1');
+  const [editSessionsPerWeek, setEditSessionsPerWeek] = useState('');
+  const [editMinDaysBetween, setEditMinDaysBetween] = useState('');
   const [editDuration, setEditDuration] = useState('30');
 
   const fetchAll = useCallback(async () => {
@@ -91,6 +95,8 @@ export default function StudyDetailPage() {
         setEditDescription(studyRecord.description || '');
         setEditTargetSessions(String(studyRecord.target_sessions));
         setEditSessionsPerDay(String(studyRecord.sessions_per_day || 1));
+        setEditSessionsPerWeek(studyRecord.sessions_per_week ? String(studyRecord.sessions_per_week) : '');
+        setEditMinDaysBetween(studyRecord.min_days_between_sessions ? String(studyRecord.min_days_between_sessions) : '');
         setEditDuration(String(studyRecord.session_duration_minutes));
       }
 
@@ -124,6 +130,8 @@ export default function StudyDetailPage() {
           description: editDescription,
           target_sessions: parseInt(editTargetSessions),
           sessions_per_day: parseInt(editSessionsPerDay),
+          sessions_per_week: editSessionsPerWeek ? parseInt(editSessionsPerWeek) : null,
+          min_days_between_sessions: editMinDaysBetween ? parseInt(editMinDaysBetween) : null,
           session_duration_minutes: parseInt(editDuration),
         }),
       });
@@ -388,6 +396,20 @@ export default function StudyDetailPage() {
             type="number"
             value={editSessionsPerDay}
             onChange={(e) => setEditSessionsPerDay(e.target.value)}
+          />
+          <Input
+            label="Sessions Per Week (optional)"
+            type="number"
+            value={editSessionsPerWeek}
+            onChange={(e) => setEditSessionsPerWeek(e.target.value)}
+            placeholder="No limit"
+          />
+          <Input
+            label="Min Days Between Sessions (optional)"
+            type="number"
+            value={editMinDaysBetween}
+            onChange={(e) => setEditMinDaysBetween(e.target.value)}
+            placeholder="No minimum"
           />
           <Input
             label="Session Duration (min)"

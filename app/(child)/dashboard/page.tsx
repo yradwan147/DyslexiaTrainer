@@ -33,10 +33,14 @@ interface StudyContext {
     name: string;
     target_sessions: number;
     sessions_per_day: number;
+    sessions_per_week: number | null;
+    min_days_between_sessions: number | null;
   };
   completed_sessions?: number;
   today_sessions?: { id: number; status: string }[];
   remaining_today?: number;
+  remaining_this_week?: number | null;
+  days_until_eligible?: number;
   study_exercises?: string[];
 }
 
@@ -104,10 +108,17 @@ export default function ChildDashboard() {
   const study = studyContext?.study;
   const completedSessions = studyContext?.completed_sessions ?? 0;
   const remainingToday = studyContext?.remaining_today ?? 0;
+  const remainingThisWeek = studyContext?.remaining_this_week;
+  const daysUntilEligible = studyContext?.days_until_eligible ?? 0;
   const todaySessions = studyContext?.today_sessions ?? [];
   const todayCompleted = todaySessions.filter(s => s.status === 'completed').length;
   const studyExercises = studyContext?.study_exercises ?? [];
   const sessionsPerDay = study?.sessions_per_day ?? 1;
+
+  // Determine if session can be started (all scheduling constraints must pass)
+  const canStartSession = remainingToday > 0
+    && (remainingThisWeek === null || remainingThisWeek === undefined || remainingThisWeek > 0)
+    && daysUntilEligible === 0;
 
   // Filter exercises to study exercises if enrolled
   const displayExercises = isEnrolled && studyExercises.length > 0
@@ -133,7 +144,7 @@ export default function ChildDashboard() {
             />
           </div>
 
-          {remainingToday > 0 ? (
+          {canStartSession ? (
             <div>
               {sessionsPerDay > 1 && todayCompleted > 0 && (
                 <p className="text-slate-500 mb-3">
@@ -151,9 +162,19 @@ export default function ChildDashboard() {
           ) : (
             <div className="text-center">
               <div className="text-6xl mb-4">🎉</div>
-              <p className="text-child-base text-green-600 font-medium">
-                All done for today! Great work!
-              </p>
+              {daysUntilEligible > 0 ? (
+                <p className="text-child-base text-blue-600 font-medium">
+                  Next session available in {daysUntilEligible} day{daysUntilEligible !== 1 ? 's' : ''}!
+                </p>
+              ) : remainingThisWeek !== null && remainingThisWeek !== undefined && remainingThisWeek <= 0 ? (
+                <p className="text-child-base text-blue-600 font-medium">
+                  You&apos;ve completed all sessions for this week! Great work!
+                </p>
+              ) : (
+                <p className="text-child-base text-green-600 font-medium">
+                  All done for today! Great work!
+                </p>
+              )}
             </div>
           )}
         </Card>

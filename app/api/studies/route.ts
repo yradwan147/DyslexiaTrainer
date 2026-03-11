@@ -50,14 +50,16 @@ export async function POST(request: NextRequest) {
     target_sessions,
     session_duration_minutes,
     sessions_per_day,
+    sessions_per_week,
+    min_days_between_sessions,
     exercises,
   } = body;
 
   // Create study
   const result = db.prepare(`
-    INSERT INTO studies (name, description, start_date, end_date, target_sessions, session_duration_minutes, sessions_per_day)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(name, description || null, start_date || null, end_date || null, target_sessions || 15, session_duration_minutes || 30, sessions_per_day || 1);
+    INSERT INTO studies (name, description, start_date, end_date, target_sessions, session_duration_minutes, sessions_per_day, sessions_per_week, min_days_between_sessions)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(name, description || null, start_date || null, end_date || null, target_sessions || 15, session_duration_minutes || 30, sessions_per_day || 1, sessions_per_week || null, min_days_between_sessions || null);
 
   const studyId = result.lastInsertRowid;
 

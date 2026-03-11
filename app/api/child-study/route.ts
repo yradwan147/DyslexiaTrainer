@@ -15,6 +15,7 @@ export async function GET() {
   // Find participant record
   const participant = db.prepare(`
     SELECT p.*, s.name as study_name, s.target_sessions, s.sessions_per_day,
+           s.sessions_per_week, s.min_days_between_sessions,
            s.session_duration_minutes, s.id as study_id
     FROM participants p
     JOIN studies s ON p.study_id = s.id
@@ -26,6 +27,8 @@ export async function GET() {
     study_name: string;
     target_sessions: number;
     sessions_per_day: number;
+    sessions_per_week: number | null;
+    min_days_between_sessions: number | null;
     session_duration_minutes: number;
   } | undefined;
 
@@ -48,6 +51,33 @@ export async function GET() {
   const todayCount = todaySessions.length;
   const sessionsPerDay = participant.sessions_per_day || 1;
   const remainingToday = Math.max(0, sessionsPerDay - todayCount);
+
+  // Calculate weekly remaining
+  let remainingThisWeek: number | null = null;
+  if (participant.sessions_per_week) {
+    const weekCount = db.prepare(`
+      SELECT COUNT(*) as count FROM sessions
+      WHERE participant_id = ?
+      AND started_at >= datetime('now', '-7 days')
+    `).get(participant.id) as { count: number };
+    remainingThisWeek = Math.max(0, participant.sessions_per_week - weekCount.count);
+  }
+
+  // Calculate days until eligible
+  let daysUntilEligible = 0;
+  if (participant.min_days_between_sessions) {
+    const lastSession = db.prepare(`
+      SELECT started_at FROM sessions
+      WHERE participant_id = ?
+      ORDER BY started_at DESC LIMIT 1
+    `).get(participant.id) as { started_at: string } | undefined;
+    if (lastSession) {
+      const daysSince = (Date.now() - new Date(lastSession.started_at).getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSince < participant.min_days_between_sessions) {
+        daysUntilEligible = Math.ceil(participant.min_days_between_sessions - daysSince);
+      }
+    }
+  }
 
   // Get unique exercise IDs from all session templates
   let studyExercises: string[] = [];
@@ -76,10 +106,14 @@ export async function GET() {
       name: participant.study_name,
       target_sessions: participant.target_sessions,
       sessions_per_day: sessionsPerDay,
+      sessions_per_week: participant.sessions_per_week,
+      min_days_between_sessions: participant.min_days_between_sessions,
     },
     completed_sessions: completedCount.count,
     today_sessions: todaySessions,
     remaining_today: remainingToday,
+    remaining_this_week: remainingThisWeek,
+    days_until_eligible: daysUntilEligible,
     study_exercises: studyExercises,
   });
 }

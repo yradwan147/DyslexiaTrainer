@@ -162,11 +162,11 @@ export async function POST(request: NextRequest) {
   if (session.user.role === 'child') {
     // Create new session for the child
     const participant = db.prepare(`
-      SELECT p.*, s.target_sessions, s.sessions_per_day FROM participants p
+      SELECT p.*, s.target_sessions, s.sessions_per_day, s.sessions_per_week, s.min_days_between_sessions FROM participants p
       JOIN users u ON p.user_id = u.id
       JOIN studies s ON p.study_id = s.id
       WHERE u.id = ?
-    `).get(session.user.id) as { id: number; target_sessions: number; sessions_per_day: number } | undefined;
+    `).get(session.user.id) as { id: number; target_sessions: number; sessions_per_day: number; sessions_per_week: number | null; min_days_between_sessions: number | null } | undefined;
 
     if (!participant) {
       return NextResponse.json({ error: 'Not enrolled in any study' }, { status: 400 });
@@ -189,6 +189,37 @@ export async function POST(request: NextRequest) {
 
     if (todayCount.count >= sessionsPerDay) {
       return NextResponse.json({ error: 'Daily session limit reached' }, { status: 400 });
+    }
+
+    // Check weekly limit
+    if (participant.sessions_per_week) {
+      const weekCount = db.prepare(`
+        SELECT COUNT(*) as count FROM sessions
+        WHERE participant_id = ?
+        AND started_at >= datetime('now', '-7 days')
+      `).get(participant.id) as { count: number };
+      if (weekCount.count >= participant.sessions_per_week) {
+        return NextResponse.json({ error: 'Weekly session limit reached' }, { status: 400 });
+      }
+    }
+
+    // Check min days between sessions
+    if (participant.min_days_between_sessions) {
+      const lastSession = db.prepare(`
+        SELECT started_at FROM sessions
+        WHERE participant_id = ?
+        ORDER BY started_at DESC LIMIT 1
+      `).get(participant.id) as { started_at: string } | undefined;
+      if (lastSession) {
+        const daysSince = (Date.now() - new Date(lastSession.started_at).getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSince < participant.min_days_between_sessions) {
+          const daysRemaining = Math.ceil(participant.min_days_between_sessions - daysSince);
+          return NextResponse.json({
+            error: `Must wait ${daysRemaining} more day${daysRemaining !== 1 ? 's' : ''} between sessions`,
+            days_remaining: daysRemaining,
+          }, { status: 400 });
+        }
+      }
     }
 
     // Create session
