@@ -54,27 +54,16 @@ Session templates define which exercises children do in each session. Most studi
 - **Add exercises** by clicking the exercise chips below the list
 - **Remove exercises** with the ✕ button
 - **Reorder exercises** with the ↑ ↓ arrows
-- **Change trial count** by editing the number next to each exercise
+- **Change the difficulty level** by editing the **Level** number next to each exercise (1–15)
+- **Change trial count** by editing the **Trials** number next to each exercise
 - **Add a new session type** with the "+ Add Session Type" button
 - **Delete a session type** with the link at the bottom (only if more than one exists)
 
-### 3. Transition Rules
+### 3. Difficulty Levels
 
-Transition rules control how difficulty levels change automatically based on a child's performance. One row per exercise:
+Difficulty is **fixed per exercise** and set by you in each Session Template (the **Level** field). A child always trains at the level you configure — it does **not** change automatically based on performance.
 
-| Setting | What it does | Default |
-|---------|-------------|---------|
-| **Advance %** | If accuracy is at or above this, the child moves up a level | 80% |
-| **Regress %** | If accuracy is below this, the child moves down a level | 50% |
-| **Min Trials** | Minimum trials needed before a level change is evaluated | 5 |
-| **Max Level** | The highest level a child can reach | 15 |
-
-**Example:** With advance = 80% and regress = 50%:
-- Child scores 90% → advances from Level 1 to Level 2
-- Child scores 60% → stays at Level 2
-- Child scores 40% → regresses from Level 2 to Level 1
-
-Click **Save Transition Rules** after making changes.
+To change a child's difficulty, edit the **Level** for that exercise in the template and save. The new level applies to that child's next session. (The same difficulty level always produces the same exercise content, so changing the level is how you give a child new/harder material.)
 
 ### 4. Participants
 
@@ -116,10 +105,10 @@ When a child logs in, here's what they see:
 4. **Completion** — Final screen shows their overall score and star rating
 5. They're returned to the dashboard
 
-### Difficulty progression:
-- Difficulty levels are tracked server-side per child per exercise
-- After each exercise, the transition rules evaluate their performance
-- Levels go up, down, or stay the same automatically — children don't choose difficulty
+### Difficulty levels:
+- Difficulty is fixed per exercise, set by the researcher in each Session Template
+- A child always trains at the configured level until you change it — levels do not change automatically, and children don't choose difficulty
+- The same level always produces the same exercise content (deterministic), which keeps difficulty consistent across children and sessions
 
 ---
 
@@ -131,7 +120,7 @@ From **Participants**, click on any child to see:
 
 1. **Study progress** — Sessions completed vs. target, with progress bar
 2. **Session history** — Table showing every session: number, date, status, exercises completed, duration
-3. **Progress summary** — Current difficulty level for each exercise
+3. **Progress summary** — The difficulty level each exercise was most recently trained at
 4. **Per-exercise charts:**
    - Accuracy over time
    - Reaction time trends
@@ -178,7 +167,7 @@ Exported data includes trial-level detail: every response, reaction time, correc
 ## Tips
 
 - **Start simple** — Create a study with 1 template and a few exercises first. You can always add more templates later.
-- **Use transition rules** — They automate difficulty progression so each child trains at their own level. The defaults (80% advance, 50% regress) work well for most cases.
+- **Set each child's level deliberately** — Difficulty is fixed per exercise in the Session Template. Choose an appropriate starting level per exercise, and raise it in the template when a child is ready for harder material.
 - **Check progress regularly** — The participant detail page gives you real-time insight into each child's performance.
 - **Lock your study** before data collection begins to prevent accidental configuration changes.
 - **Sessions per day > 1** — Useful for intensive training protocols. Templates cycle across sessions, so with 2 templates and 2 sessions/day, children alternate between template types each session.

@@ -29,6 +29,8 @@ export function VisualMemory({ config, currentTrialIndex, onTrialComplete }: Exe
   const [availableItems, setAvailableItems] = useState<string[]>([]);
   const [showWrongFeedback, setShowWrongFeedback] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
+  // Count sequences reproduced correctly (real per-run score numerator).
+  const correctPuzzlesRef = useRef<number>(0);
 
   const currentSequence: MemorySequence = session.sequences[currentPuzzle];
 
@@ -49,6 +51,7 @@ export function VisualMemory({ config, currentTrialIndex, onTrialComplete }: Exe
     setRetryCount(0);
     setTimeRemaining(DISPLAY_TIME_MS / 1000);
     setShowWrongFeedback(false);
+    correctPuzzlesRef.current = 0;
     startTimeRef.current = Date.now();
   }, [currentTrialIndex]);
 
@@ -75,11 +78,14 @@ export function VisualMemory({ config, currentTrialIndex, onTrialComplete }: Exe
         trial_index: currentTrialIndex,
         user_response: JSON.stringify({
           puzzlesCompleted: totalPuzzles,
+          correctPuzzles: correctPuzzlesRef.current,
           totalRetries: retryCount,
           sessionNumber,
         }),
         response_time_ms: Date.now() - startTimeRef.current,
         is_correct: true,
+        score_correct: correctPuzzlesRef.current,
+        score_total: totalPuzzles,
         is_timed_out: false,
         is_skipped: false,
         started_at: new Date(startTimeRef.current).toISOString(),
@@ -100,6 +106,7 @@ export function VisualMemory({ config, currentTrialIndex, onTrialComplete }: Exe
       if (newSeq.length >= currentSequence.sequence.length) {
         const isCorrect = newSeq.every((it, idx) => it === currentSequence.sequence[idx]);
         if (isCorrect) {
+          correctPuzzlesRef.current += 1;
           setPhase('feedback');
           setTimeout(() => advanceToNext(), 1500);
         } else {

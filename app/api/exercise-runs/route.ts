@@ -39,15 +39,28 @@ export async function PATCH(request: NextRequest) {
 
   const db = getDb();
   const body = await request.json();
-  const { exerciseRunId, correct_count, avg_reaction_time_ms, metrics } = body;
+  const { exerciseRunId, correct_count, total_trials, avg_reaction_time_ms, metrics } = body;
 
-  db.prepare(`
-    UPDATE exercise_runs
-    SET ended_at = datetime('now'),
-        correct_count = ?,
-        avg_reaction_time_ms = ?
-    WHERE id = ?
-  `).run(correct_count, avg_reaction_time_ms, exerciseRunId);
+  // Update correct_count/reaction time, and the real scored-task total when provided
+  // (exercises report their actual number of scored sub-tasks at completion).
+  if (total_trials !== undefined && total_trials !== null) {
+    db.prepare(`
+      UPDATE exercise_runs
+      SET ended_at = datetime('now'),
+          correct_count = ?,
+          total_trials = ?,
+          avg_reaction_time_ms = ?
+      WHERE id = ?
+    `).run(correct_count, total_trials, avg_reaction_time_ms, exerciseRunId);
+  } else {
+    db.prepare(`
+      UPDATE exercise_runs
+      SET ended_at = datetime('now'),
+          correct_count = ?,
+          avg_reaction_time_ms = ?
+      WHERE id = ?
+    `).run(correct_count, avg_reaction_time_ms, exerciseRunId);
+  }
 
   // Store exercise-specific metrics if provided
   if (metrics && typeof metrics === 'object') {

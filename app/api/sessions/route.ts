@@ -54,22 +54,16 @@ export async function GET(request: NextRequest) {
         // Get exercises from template
         const templateExercises = db.prepare(
           'SELECT * FROM session_template_exercises WHERE template_id = ? ORDER BY display_order ASC'
-        ).all(template.id) as { exercise_id: string; exercise_version: string; trial_count: number; display_order: number }[];
+        ).all(template.id) as { exercise_id: string; exercise_version: string; trial_count: number; difficulty_level: number; display_order: number }[];
 
-        // Get current levels from exercise_progress
-        exercises = templateExercises.map(te => {
-          const progress = db.prepare(
-            'SELECT current_level FROM exercise_progress WHERE user_id = ? AND study_id = ? AND exercise_id = ?'
-          ).get(participant.user_id, participant.study_id, te.exercise_id) as { current_level: number } | undefined;
-
-          return {
-            exercise_id: te.exercise_id,
-            exercise_version: te.exercise_version,
-            trial_count: te.trial_count,
-            display_order: te.display_order,
-            current_level: progress?.current_level ?? 1,
-          };
-        });
+        // Level is the fixed difficulty configured by the researcher on the template.
+        exercises = templateExercises.map(te => ({
+          exercise_id: te.exercise_id,
+          exercise_version: te.exercise_version,
+          trial_count: te.trial_count,
+          display_order: te.display_order,
+          current_level: te.difficulty_level ?? 1,
+        }));
       }
     }
 

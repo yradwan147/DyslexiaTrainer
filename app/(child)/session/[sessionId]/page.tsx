@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StarRating } from '@/components/ui/Feedback';
 import { EXERCISE_NAMES, ExerciseId } from '@/lib/exercises/types';
-import type { ExerciseConfig, TrialResult } from '@/lib/exercises/types';
+import type { ExerciseConfig, TrialResult, ExerciseScore } from '@/lib/exercises/types';
+import { extractMetrics } from '@/lib/transitions';
 
 interface SessionExercise {
   exercise_id: string;
@@ -111,11 +112,18 @@ export default function SessionPage() {
   }, [sessionId]);
 
   // Handle exercise completion
-  const handleExerciseComplete = useCallback(async (results: TrialResult[]) => {
-    const correctCount = results.filter(r => r.is_correct).length;
+  const handleExerciseComplete = useCallback(async (results: TrialResult[], score?: ExerciseScore) => {
+    const currentExercise = exercises[currentExerciseIndex];
+    // Prefer the exercise's real aggregate score (correct sub-tasks / total sub-tasks);
+    // fall back to per-trial results for exercises that report them (e.g. coherent_motion).
+    const correctCount = score ? score.correct_count : results.filter(r => r.is_correct).length;
+    const totalTrials = score ? score.total_trials : results.length;
     const avgReactionTime = results.length > 0
       ? results.reduce((sum, r) => sum + r.response_time_ms, 0) / results.length
       : 0;
+    // Extract exercise-specific metrics from the last result's payload for research data.
+    const lastResponse = results.length > 0 ? results[results.length - 1].user_response : '';
+    const metrics = extractMetrics(currentExercise.exercise_id, lastResponse, avgReactionTime);
 
     // Update exercise run with results (non-critical)
     try {
@@ -126,23 +134,25 @@ export default function SessionPage() {
           body: JSON.stringify({
             exerciseRunId: currentExerciseRunId,
             correct_count: correctCount,
+            total_trials: totalTrials,
             avg_reaction_time_ms: avgReactionTime,
+            metrics,
           }),
         });
 
         setExerciseRuns(prev => [...prev, {
           id: currentExerciseRunId,
-          exercise_id: exercises[currentExerciseIndex].exercise_id,
+          exercise_id: currentExercise.exercise_id,
           correct_count: correctCount,
-          total_trials: results.length,
+          total_trials: totalTrials,
         }]);
       }
     } catch {
       // Non-critical, continue to next exercise
     }
 
-    // Update exercise progress with transition logic (non-critical)
-    const currentExercise = exercises[currentExerciseIndex];
+    // Record session-completion tracking (non-critical). Difficulty level is
+    // researcher-set and fixed, so this no longer changes the level.
     try {
       await fetch('/api/exercise-progress', {
         method: 'POST',
@@ -150,7 +160,7 @@ export default function SessionPage() {
         body: JSON.stringify({
           exercise_id: currentExercise.exercise_id,
           correct_count: correctCount,
-          total_trials: results.length,
+          total_trials: totalTrials,
         }),
       });
     } catch {
@@ -159,7 +169,7 @@ export default function SessionPage() {
 
     setSessionStats(prev => ({
       totalCorrect: prev.totalCorrect + correctCount,
-      totalTrials: prev.totalTrials + results.length,
+      totalTrials: prev.totalTrials + totalTrials,
     }));
 
     // Check if more exercises

@@ -33,6 +33,8 @@ export function VisualSearch({ config, currentTrialIndex, onTrialComplete }: Exe
   const [wrongClicks, setWrongClicks] = useState<Set<string>>(new Set());
   const [showSuccess, setShowSuccess] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
+  // Count puzzles solved with no wrong clicks (real per-run score numerator).
+  const correctPuzzlesRef = useRef<number>(0);
 
   const puzzleConfig = sessionPuzzles[currentPuzzle];
   const { gridSize, mainItem, differentItems, totalDifferent, description } = puzzleConfig;
@@ -50,6 +52,7 @@ export function VisualSearch({ config, currentTrialIndex, onTrialComplete }: Exe
     setFoundItems(new Set());
     setWrongClicks(new Set());
     setShowSuccess(false);
+    correctPuzzlesRef.current = 0;
     startTimeRef.current = Date.now();
   }, [currentTrialIndex]);
 
@@ -60,17 +63,23 @@ export function VisualSearch({ config, currentTrialIndex, onTrialComplete }: Exe
 
   // Advance to next puzzle or complete session
   const advanceToNext = useCallback(() => {
+    // Tally this puzzle: "correct" = solved without any wrong click.
+    const correctSoFar = correctPuzzlesRef.current + (wrongClicks.size === 0 ? 1 : 0);
+    correctPuzzlesRef.current = correctSoFar;
     const next = currentPuzzle + 1;
     if (next >= PUZZLES_PER_SESSION) {
       onTrialComplete({
         trial_index: currentTrialIndex,
         user_response: JSON.stringify({
           puzzlesCompleted: PUZZLES_PER_SESSION,
+          correctPuzzles: correctSoFar,
           wrongClicks: wrongClicks.size,
           level,
         }),
         response_time_ms: Date.now() - startTimeRef.current,
         is_correct: true,
+        score_correct: correctSoFar,
+        score_total: PUZZLES_PER_SESSION,
         is_timed_out: false,
         is_skipped: false,
         started_at: new Date(startTimeRef.current).toISOString(),

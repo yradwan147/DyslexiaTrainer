@@ -221,13 +221,17 @@ export default function ParticipantDetailPage() {
         <h2 className="text-xl font-bold text-slate-800 mb-4">Progress Summary</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {Object.entries(EXERCISE_NAMES).map(([id, name]) => {
-            const p = progress.find(pr => pr.exercise_id === id);
             const exerciseRuns = runsByExercise[id] || [];
+            // Researcher-set fixed level: show the level the child actually trained at
+            // most recently (= the difficulty configured on the study's session template).
+            const latestLevel = exerciseRuns.length > 0
+              ? exerciseRuns[exerciseRuns.length - 1].difficulty_level
+              : null;
             return (
               <div key={id} className="bg-slate-50 rounded-xl p-4 text-center">
                 <p className="text-sm font-medium text-slate-600">{name}</p>
                 <p className="text-2xl font-bold text-slate-800 mt-1">
-                  Lv {p?.current_level || 1}
+                  {latestLevel !== null ? `Lv ${latestLevel}` : '—'}
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
                   {exerciseRuns.length} runs

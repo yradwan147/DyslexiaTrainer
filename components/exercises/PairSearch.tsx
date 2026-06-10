@@ -63,6 +63,8 @@ export function PairSearch({ config, currentTrialIndex, onTrialComplete }: Exerc
       }),
       response_time_ms: Date.now() - startTimeRef.current,
       is_correct: true,
+      score_correct: ROUNDS_PER_SESSION,
+      score_total: ROUNDS_PER_SESSION + totalWrongAttempts,
       is_timed_out: false,
       is_skipped: false,
       started_at: new Date(startTimeRef.current).toISOString(),

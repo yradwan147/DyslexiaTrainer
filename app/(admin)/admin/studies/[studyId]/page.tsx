@@ -14,6 +14,7 @@ interface TemplateExercise {
   exercise_id: string;
   exercise_version: string;
   trial_count: number;
+  difficulty_level: number;
   display_order: number;
 }
 
@@ -23,16 +24,6 @@ interface SessionTemplate {
   template_number: number;
   label: string | null;
   exercises: TemplateExercise[];
-}
-
-interface TransitionRule {
-  id?: number;
-  study_id: number;
-  exercise_id: string;
-  advance_threshold: number;
-  regress_threshold: number;
-  min_trials_required: number;
-  max_level: number;
 }
 
 interface ParticipantRow {
@@ -63,7 +54,6 @@ export default function StudyDetailPage() {
 
   const [study, setStudy] = useState<StudyData | null>(null);
   const [templates, setTemplates] = useState<SessionTemplate[]>([]);
-  const [rules, setRules] = useState<TransitionRule[]>([]);
   const [participants, setParticipants] = useState<ParticipantRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -80,10 +70,9 @@ export default function StudyDetailPage() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [studiesRes, templatesRes, rulesRes, participantsRes] = await Promise.all([
+      const [studiesRes, templatesRes, participantsRes] = await Promise.all([
         fetch('/api/studies'),
         fetch(`/api/session-templates?studyId=${studyId}`),
-        fetch(`/api/transition-rules?studyId=${studyId}`),
         fetch(`/api/participants?studyId=${studyId}`),
       ]);
 
@@ -102,9 +91,6 @@ export default function StudyDetailPage() {
 
       const templatesData = await templatesRes.json();
       setTemplates(templatesData.templates || []);
-
-      const rulesData = await rulesRes.json();
-      setRules(rulesData.rules || []);
 
       const participantsData = await participantsRes.json();
       setParticipants(participantsData.participants || []);
@@ -180,12 +166,14 @@ export default function StudyDetailPage() {
         exercise_id: e.exercise_id,
         exercise_version: e.exercise_version,
         trial_count: e.trial_count,
+        difficulty_level: e.difficulty_level,
         display_order: e.display_order,
       })),
       {
         exercise_id: exerciseId,
         exercise_version: '1.0.0',
         trial_count: 10,
+        difficulty_level: 1,
         display_order: template.exercises.length + 1,
       },
     ];
@@ -209,6 +197,7 @@ export default function StudyDetailPage() {
         exercise_id: e.exercise_id,
         exercise_version: e.exercise_version,
         trial_count: e.trial_count,
+        difficulty_level: e.difficulty_level,
         display_order: idx + 1,
       }));
 
@@ -229,6 +218,28 @@ export default function StudyDetailPage() {
       exercise_id: e.exercise_id,
       exercise_version: e.exercise_version,
       trial_count: e.exercise_id === exerciseId ? trials : e.trial_count,
+      difficulty_level: e.difficulty_level,
+      display_order: e.display_order,
+    }));
+
+    await fetch('/api/session-templates', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: templateId, exercises: newExercises }),
+    });
+    await fetchAll();
+  };
+
+  // Update exercise difficulty level in template (researcher-set fixed level)
+  const updateExerciseLevel = async (templateId: number, exerciseId: string, level: number) => {
+    const template = templates.find(t => t.id === templateId);
+    if (!template) return;
+
+    const newExercises = template.exercises.map(e => ({
+      exercise_id: e.exercise_id,
+      exercise_version: e.exercise_version,
+      trial_count: e.trial_count,
+      difficulty_level: e.exercise_id === exerciseId ? level : e.difficulty_level,
       display_order: e.display_order,
     }));
 
@@ -256,6 +267,7 @@ export default function StudyDetailPage() {
       exercise_id: e.exercise_id,
       exercise_version: e.exercise_version,
       trial_count: e.trial_count,
+      difficulty_level: e.difficulty_level,
       display_order: i + 1,
     }));
 
@@ -265,59 +277,6 @@ export default function StudyDetailPage() {
       body: JSON.stringify({ id: templateId, exercises: newExercises }),
     });
     await fetchAll();
-  };
-
-  // Save transition rules
-  const saveRules = async () => {
-    setSaving(true);
-    try {
-      // Get all unique exercises across all templates
-      const allExerciseIds = new Set<string>();
-      for (const t of templates) {
-        for (const e of t.exercises) {
-          allExerciseIds.add(e.exercise_id);
-        }
-      }
-
-      for (const exerciseId of Array.from(allExerciseIds)) {
-        const existing = rules.find(r => r.exercise_id === exerciseId);
-        await fetch('/api/transition-rules', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            study_id: studyId,
-            exercise_id: exerciseId,
-            advance_threshold: existing?.advance_threshold ?? 0.8,
-            regress_threshold: existing?.regress_threshold ?? 0.5,
-            min_trials_required: existing?.min_trials_required ?? 5,
-            max_level: existing?.max_level ?? 15,
-          }),
-        });
-      }
-      await fetchAll();
-    } catch (error) {
-      console.error('Error saving rules:', error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const updateRuleLocal = (exerciseId: string, field: keyof TransitionRule, value: number) => {
-    setRules(prev => {
-      const existing = prev.find(r => r.exercise_id === exerciseId);
-      if (existing) {
-        return prev.map(r => r.exercise_id === exerciseId ? { ...r, [field]: value } : r);
-      }
-      return [...prev, {
-        study_id: studyId,
-        exercise_id: exerciseId,
-        advance_threshold: 0.8,
-        regress_threshold: 0.5,
-        min_trials_required: 5,
-        max_level: 15,
-        [field]: value,
-      }];
-    });
   };
 
   if (loading) {
@@ -330,14 +289,6 @@ export default function StudyDetailPage() {
 
   if (!study) {
     return <p className="text-slate-500">Study not found.</p>;
-  }
-
-  // Collect all unique exercises across templates for transition rules
-  const allExerciseIds = new Set<string>();
-  for (const t of templates) {
-    for (const e of t.exercises) {
-      allExerciseIds.add(e.exercise_id);
-    }
   }
 
   const activeTemplate = templates[activeTemplateIdx] || null;
@@ -471,6 +422,17 @@ export default function StudyDetailPage() {
                       {EXERCISE_NAMES[ex.exercise_id as ExerciseId] || ex.exercise_id}
                     </span>
                     <div className="flex items-center gap-2">
+                      <label className="text-sm text-slate-500">Level:</label>
+                      <input
+                        type="number"
+                        value={ex.difficulty_level}
+                        onChange={(e) => updateExerciseLevel(activeTemplate.id, ex.exercise_id, parseInt(e.target.value) || 1)}
+                        className="w-16 px-2 py-1 border rounded text-sm"
+                        min="1"
+                        max="15"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
                       <label className="text-sm text-slate-500">Trials:</label>
                       <input
                         type="number"
@@ -538,81 +500,15 @@ export default function StudyDetailPage() {
         )}
       </Card>
 
-      {/* Section 3: Transition Rules */}
+      {/* Section 3: Difficulty Levels (researcher-set, fixed) */}
       <Card>
-        <h2 className="text-xl font-bold text-slate-800 mb-4">Transition Rules</h2>
-        {allExerciseIds.size === 0 ? (
-          <p className="text-slate-400">Add exercises to templates first</p>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left">
-                    <th className="py-2 pr-4 font-medium text-slate-600">Exercise</th>
-                    <th className="py-2 px-2 font-medium text-slate-600">Advance %</th>
-                    <th className="py-2 px-2 font-medium text-slate-600">Regress %</th>
-                    <th className="py-2 px-2 font-medium text-slate-600">Min Trials</th>
-                    <th className="py-2 px-2 font-medium text-slate-600">Max Level</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.from(allExerciseIds).map(exerciseId => {
-                    const rule = rules.find(r => r.exercise_id === exerciseId);
-                    return (
-                      <tr key={exerciseId} className="border-b">
-                        <td className="py-2 pr-4 font-medium">
-                          {EXERCISE_NAMES[exerciseId as ExerciseId] || exerciseId}
-                        </td>
-                        <td className="py-2 px-2">
-                          <input
-                            type="number"
-                            value={Math.round((rule?.advance_threshold ?? 0.8) * 100)}
-                            onChange={(e) => updateRuleLocal(exerciseId, 'advance_threshold', parseInt(e.target.value) / 100)}
-                            className="w-16 px-2 py-1 border rounded"
-                            min="0"
-                            max="100"
-                          />
-                        </td>
-                        <td className="py-2 px-2">
-                          <input
-                            type="number"
-                            value={Math.round((rule?.regress_threshold ?? 0.5) * 100)}
-                            onChange={(e) => updateRuleLocal(exerciseId, 'regress_threshold', parseInt(e.target.value) / 100)}
-                            className="w-16 px-2 py-1 border rounded"
-                            min="0"
-                            max="100"
-                          />
-                        </td>
-                        <td className="py-2 px-2">
-                          <input
-                            type="number"
-                            value={rule?.min_trials_required ?? 5}
-                            onChange={(e) => updateRuleLocal(exerciseId, 'min_trials_required', parseInt(e.target.value))}
-                            className="w-16 px-2 py-1 border rounded"
-                            min="1"
-                          />
-                        </td>
-                        <td className="py-2 px-2">
-                          <input
-                            type="number"
-                            value={rule?.max_level ?? 15}
-                            onChange={(e) => updateRuleLocal(exerciseId, 'max_level', parseInt(e.target.value))}
-                            className="w-16 px-2 py-1 border rounded"
-                            min="1"
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-4">
-              <Button onClick={saveRules} isLoading={saving}>Save Transition Rules</Button>
-            </div>
-          </>
-        )}
+        <h2 className="text-xl font-bold text-slate-800 mb-4">Difficulty Levels</h2>
+        <p className="text-slate-500">
+          Difficulty is <span className="font-medium">fixed per exercise</span> and set by you in
+          each <span className="font-medium">Session Template</span> above (the <span className="font-medium">Level</span> field).
+          A child always trains at the level you configure; it does not change automatically based on
+          performance. To change a child&apos;s difficulty, edit the Level in the template and save.
+        </p>
       </Card>
 
       {/* Section 4: Participants */}

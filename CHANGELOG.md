@@ -2,6 +2,23 @@
 
 All notable changes to the DyslexiaTrainer project will be documented in this file.
 
+## [2.1.0] - 2026-06-09
+
+### Fixed — Exercises stuck on Level 1 across sessions
+
+Children's exercises always ran at Level 1 with identical content every session. Root cause: the session is built from session templates, but `session_template_exercises` had no difficulty field, so the level always defaulted to 1. The only level mechanism (accuracy-based auto-advance) was also unreliable because most exercises reported a single hardcoded "correct" result.
+
+**Difficulty is now researcher-set and fixed:**
+- Added `difficulty_level` to `session_template_exercises` (idempotent runtime migration; non-destructive).
+- Researchers set a fixed **Level** per exercise in each Session Template; the child's session uses that level and it no longer changes automatically.
+- Removed the auto-advancement / Transition Rules editor (replaced with a "Difficulty Levels" info panel). The progress endpoint no longer mutates levels.
+
+**Real per-exercise scoring (research data):**
+- Every exercise now reports its true `correct_count` / `total_trials` (previously 7 of 9 hardcoded `is_correct: true`); exercise runs record the real scored-task totals and exercise-specific metrics.
+
+**Reliability:**
+- Hardened `initializeDatabase()` to run schema statements individually so one failing index can no longer abort the migration step (ensures the new column is added on existing deployments).
+
 ## [2.0.6] - 2026-01-31
 
 ### Visual Search - Complete Implementation from Reference Images

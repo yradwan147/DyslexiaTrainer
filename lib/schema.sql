@@ -154,6 +154,7 @@ CREATE TABLE IF NOT EXISTS session_template_exercises (
   exercise_id TEXT NOT NULL,
   exercise_version TEXT DEFAULT '1.0.0',
   trial_count INTEGER DEFAULT 10,
+  difficulty_level INTEGER NOT NULL DEFAULT 1,
   display_order INTEGER NOT NULL,
   FOREIGN KEY (template_id) REFERENCES session_templates(id) ON DELETE CASCADE
 );

@@ -7,7 +7,8 @@ import { getExerciseConfig } from '@/lib/exercises/configGenerator';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StarRating } from '@/components/ui/Feedback';
-import type { ExerciseConfig, TrialResult } from '@/lib/exercises/types';
+import type { ExerciseConfig, TrialResult, ExerciseScore } from '@/lib/exercises/types';
+import { extractMetrics } from '@/lib/transitions';
 
 const EXERCISE_INFO: Record<string, { name: string; description: string; icon: string }> = {
   coherent_motion: { name: 'Coherent Motion Detection', description: 'Find the side where dots are moving together', icon: '🌊' },
@@ -129,11 +130,14 @@ export default function ExercisePage() {
   }, [exerciseId, difficulty, isAutoProgression, serverLevel]);
 
   // Handle exercise completion
-  const handleExerciseComplete = useCallback(async (trialResults: TrialResult[]) => {
-    const correctCount = trialResults.filter(r => r.is_correct).length;
+  const handleExerciseComplete = useCallback(async (trialResults: TrialResult[], score?: ExerciseScore) => {
+    const correctCount = score ? score.correct_count : trialResults.filter(r => r.is_correct).length;
+    const totalTrials = score ? score.total_trials : trialResults.length;
     const avgReactionTime = trialResults.length > 0
       ? trialResults.reduce((sum, r) => sum + r.response_time_ms, 0) / trialResults.length
       : 0;
+    const lastResponse = trialResults.length > 0 ? trialResults[trialResults.length - 1].user_response : '';
+    const metrics = extractMetrics(exerciseId, lastResponse, avgReactionTime);
 
     // Update exercise run with results
     if (exerciseRunId) {
@@ -143,12 +147,14 @@ export default function ExercisePage() {
         body: JSON.stringify({
           exerciseRunId,
           correct_count: correctCount,
+          total_trials: totalTrials,
           avg_reaction_time_ms: avgReactionTime,
+          metrics,
         }),
       });
     }
 
-    setResults({ correct: correctCount, total: trialResults.length });
+    setResults({ correct: correctCount, total: totalTrials });
     setPhase('complete');
 
     // Update server-side progress for auto-progression exercises

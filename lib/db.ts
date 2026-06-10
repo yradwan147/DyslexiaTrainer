@@ -37,14 +37,34 @@ export function initializeDatabase(): void {
   const schemaPath = path.join(process.cwd(), 'lib', 'schema.sql');
   if (fs.existsSync(schemaPath)) {
     const schema = fs.readFileSync(schemaPath, 'utf-8');
-    db.exec(schema);
-    console.log('[DB] Schema initialized');
+    // Execute each statement independently so that one failing object (e.g. an index
+    // on a column an older DB hasn't gained yet) does NOT abort the rest of the schema
+    // — critically, the column migrations below must always run. Strip full-line
+    // comments first so leading "-- ..." lines don't get split off as their own chunks.
+    const statements = schema
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+      .join('\n')
+      .split(';')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    let failures = 0;
+    for (const stmt of statements) {
+      try {
+        db.exec(stmt);
+      } catch (err) {
+        failures++;
+        console.warn('[DB] Schema statement skipped:', (err as Error).message);
+      }
+    }
+    console.log(`[DB] Schema initialized (${statements.length - failures}/${statements.length} statements)`);
   }
 
   // Migrations for new columns (safe to re-run; ALTER throws if column already exists)
   const migrations: [string, string][] = [
     ['sessions_per_week', 'ALTER TABLE studies ADD COLUMN sessions_per_week INTEGER DEFAULT NULL'],
     ['min_days_between_sessions', 'ALTER TABLE studies ADD COLUMN min_days_between_sessions INTEGER DEFAULT NULL'],
+    ['template_exercise_level', 'ALTER TABLE session_template_exercises ADD COLUMN difficulty_level INTEGER DEFAULT 1'],
   ];
   for (const [name, sql] of migrations) {
     try {
@@ -264,6 +284,7 @@ export interface SessionTemplateExercise {
   exercise_id: string;
   exercise_version: string;
   trial_count: number;
+  difficulty_level: number;
   display_order: number;
 }
 

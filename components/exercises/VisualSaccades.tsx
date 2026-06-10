@@ -111,6 +111,8 @@ export function VisualSaccades({ config, currentTrialIndex, onTrialComplete }: E
             }),
             response_time_ms: Date.now() - startTimeRef.current,
             is_correct: true,
+            score_correct: totalHits + 1,
+            score_total: MOVEMENTS_PER_TRIAL * TRIALS_PER_SESSION,
             is_timed_out: false,
             is_skipped: false,
             started_at: new Date(startTimeRef.current).toISOString(),

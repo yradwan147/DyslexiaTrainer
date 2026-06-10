@@ -106,13 +106,25 @@ export interface TrialResult {
   is_skipped: boolean;
   started_at: string;
   responded_at: string;
+  // Self-contained exercises (one summary result for the whole run) report their
+  // real aggregate score here: correct scored sub-tasks out of total sub-tasks.
+  score_correct?: number;
+  score_total?: number;
+}
+
+// Real aggregate score reported by a self-contained exercise at completion.
+// correct_count / total_trials reflect the exercise's actual scored sub-tasks
+// (rounds, puzzles, movements, lines...), used for research data and charts.
+export interface ExerciseScore {
+  correct_count: number;
+  total_trials: number;
 }
 
 // Exercise component props
 export interface ExerciseProps {
   config: ExerciseConfig;
   onTrialComplete: (result: TrialResult) => void;
-  onExerciseComplete: () => void;
+  onExerciseComplete: (score?: ExerciseScore) => void;
   currentTrialIndex: number;
   showFeedback: boolean;
 }

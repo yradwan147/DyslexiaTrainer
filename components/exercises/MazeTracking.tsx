@@ -28,11 +28,14 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
   const [availableHeight, setAvailableHeight] = useState(500);
   const startTimeRef = useRef<number>(Date.now());
   const wrapperRef = useRef<HTMLDivElement>(null);
+  // Count clicks on unreachable (incorrect) objects for the real per-run score.
+  const wrongClicksRef = useRef<number>(0);
 
   useEffect(() => {
     setCollectedSet(new Set());
     setWrongClickOrder(null);
     setIsComplete(false);
+    wrongClicksRef.current = 0;
     startTimeRef.current = Date.now();
   }, [currentTrialIndex]);
 
@@ -54,9 +57,17 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
   const handleComplete = useCallback(() => {
     onTrialComplete({
       trial_index: currentTrialIndex,
-      user_response: JSON.stringify({ maze_id, level, collected: reachable_count }),
+      user_response: JSON.stringify({
+        maze_id,
+        level,
+        collected: reachable_count,
+        correctClicks: reachable_count,
+        wrongClicks: wrongClicksRef.current,
+      }),
       response_time_ms: Date.now() - startTimeRef.current,
       is_correct: true,
+      score_correct: reachable_count,
+      score_total: reachable_count + wrongClicksRef.current,
       is_timed_out: false,
       is_skipped: false,
       started_at: new Date(startTimeRef.current).toISOString(),
@@ -74,6 +85,7 @@ export function MazeTracking({ config, currentTrialIndex, onTrialComplete }: Exe
       
       if (!obj.reachable) {
         // Show red feedback for unreachable (incorrect) object
+        wrongClicksRef.current += 1;
         setWrongClickOrder(order);
         setTimeout(() => setWrongClickOrder(null), 600);
         return;

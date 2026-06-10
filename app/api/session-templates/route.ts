@@ -63,11 +63,11 @@ export async function POST(request: NextRequest) {
   // Add exercises if provided
   if (exercises && exercises.length > 0) {
     const insertEx = db.prepare(`
-      INSERT INTO session_template_exercises (template_id, exercise_id, exercise_version, trial_count, display_order)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO session_template_exercises (template_id, exercise_id, exercise_version, trial_count, difficulty_level, display_order)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
     for (const ex of exercises) {
-      insertEx.run(templateId, ex.exercise_id, ex.exercise_version || '1.0.0', ex.trial_count || 10, ex.display_order);
+      insertEx.run(templateId, ex.exercise_id, ex.exercise_version || '1.0.0', ex.trial_count || 10, ex.difficulty_level ?? 1, ex.display_order);
     }
   }
 
@@ -103,12 +103,12 @@ export async function PATCH(request: NextRequest) {
     db.prepare('DELETE FROM session_template_exercises WHERE template_id = ?').run(id);
 
     const insertEx = db.prepare(`
-      INSERT INTO session_template_exercises (template_id, exercise_id, exercise_version, trial_count, display_order)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO session_template_exercises (template_id, exercise_id, exercise_version, trial_count, difficulty_level, display_order)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
 
     for (const ex of exercises) {
-      insertEx.run(id, ex.exercise_id, ex.exercise_version || '1.0.0', ex.trial_count || 10, ex.display_order);
+      insertEx.run(id, ex.exercise_id, ex.exercise_version || '1.0.0', ex.trial_count || 10, ex.difficulty_level ?? 1, ex.display_order);
     }
   }
 

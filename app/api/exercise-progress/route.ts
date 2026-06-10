@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { evaluateTransition } from '@/lib/transitions';
 
 // GET: Fetch current progress for a user/exercise
 export async function GET(request: NextRequest) {
@@ -75,34 +74,11 @@ export async function POST(request: NextRequest) {
   ).get(userId, studyId, exercise_id) as { current_level: number; total_sessions_completed: number } | undefined;
 
   const currentLevel = existing?.current_level ?? 1;
-  let newLevel: number;
-
-  // Use transition logic if correct_count and total_trials are provided
-  if (correct_count !== undefined && total_trials !== undefined) {
-    // Look up transition rules for this study/exercise
-    const rule = db.prepare(
-      'SELECT * FROM transition_rules WHERE study_id = ? AND exercise_id = ?'
-    ).get(studyId, exercise_id) as {
-      advance_threshold: number;
-      regress_threshold: number;
-      min_trials_required: number;
-      max_level: number;
-    } | undefined;
-
-    const result = evaluateTransition({
-      correctCount: correct_count,
-      totalTrials: total_trials,
-      currentLevel,
-      rule: rule || undefined,
-    });
-
-    newLevel = result.newLevel;
-  } else if (increment_level) {
-    // Legacy: blind increment
-    newLevel = Math.min(15, currentLevel + 1);
-  } else {
-    newLevel = currentLevel;
-  }
+  // Difficulty level is researcher-set and fixed per exercise on the session template
+  // (see session_template_exercises.difficulty_level). It must NOT auto-advance, so the
+  // level is never changed here — this endpoint only records session-completion tracking.
+  const newLevel = currentLevel;
+  void increment_level;
 
   // Upsert progress
   if (existing) {

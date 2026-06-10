@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Feedback } from '@/components/ui/Feedback';
-import type { ExerciseConfig, TrialResult } from '@/lib/exercises/types';
+import type { ExerciseConfig, TrialResult, ExerciseScore } from '@/lib/exercises/types';
 
 // Exercise components
 import { CoherentMotion } from './CoherentMotion';
@@ -21,7 +21,7 @@ import { PairSearch } from './PairSearch';
 interface ExerciseRunnerProps {
   config: ExerciseConfig;
   exerciseRunId: number;
-  onComplete: (results: TrialResult[]) => void;
+  onComplete: (results: TrialResult[], score?: ExerciseScore) => void;
   onExit: () => void;
 }
 
@@ -70,9 +70,22 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
     }
   }, [currentTrialIndex, totalTrials]);
 
+  // Derive the real aggregate score. Self-contained exercises emit one summary
+  // result carrying score_correct/score_total; per-trial exercises (coherent_motion)
+  // leave it undefined and the score is computed from per-trial is_correct downstream.
+  const aggregateScore: ExerciseScore | undefined = (() => {
+    const scored = results.find(r => typeof r.score_total === 'number');
+    if (scored) return { correct_count: scored.score_correct ?? 0, total_trials: scored.score_total as number };
+    return undefined;
+  })();
+
   // Handle exercise completion
   const handleExerciseComplete = useCallback(() => {
-    onComplete(results);
+    const scored = results.find(r => typeof r.score_total === 'number');
+    const score: ExerciseScore | undefined = scored
+      ? { correct_count: scored.score_correct ?? 0, total_trials: scored.score_total as number }
+      : undefined;
+    onComplete(results, score);
   }, [results, onComplete]);
 
   // Start exercise
@@ -178,8 +191,9 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
 
   // Complete screen
   if (phase === 'complete') {
-    const correctCount = results.filter(r => r.is_correct).length;
-    const percentage = Math.round((correctCount / totalTrials) * 100);
+    const correctCount = aggregateScore ? aggregateScore.correct_count : results.filter(r => r.is_correct).length;
+    const scoreTotal = aggregateScore ? aggregateScore.total_trials : totalTrials;
+    const percentage = scoreTotal > 0 ? Math.round((correctCount / scoreTotal) * 100) : 0;
 
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-gradient-to-b from-success-50 to-success-100">
@@ -189,7 +203,7 @@ export function ExerciseRunner({ config, exerciseRunId, onComplete, onExit }: Ex
             Great Job!
           </h1>
           <p className="text-child-base text-slate-600 mb-4">
-            You got {correctCount} out of {totalTrials} correct!
+            You got {correctCount} out of {scoreTotal} correct!
           </p>
           <div className="text-6xl mb-8">
             {percentage >= 80 ? '⭐⭐⭐' : percentage >= 50 ? '⭐⭐' : '⭐'}

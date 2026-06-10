@@ -67,12 +67,14 @@ export function LineTracking({ config, currentTrialIndex, onTrialComplete }: Exe
       user_response: JSON.stringify({ level, wrongAttempts }),
       response_time_ms: Date.now() - startTimeRef.current,
       is_correct: true,
+      score_correct: itemCount,
+      score_total: itemCount + wrongAttempts,
       is_timed_out: false,
       is_skipped: false,
       started_at: new Date(startTimeRef.current).toISOString(),
       responded_at: new Date().toISOString(),
     });
-  }, [currentTrialIndex, level, wrongAttempts, onTrialComplete]);
+  }, [currentTrialIndex, level, wrongAttempts, itemCount, onTrialComplete]);
 
   const handleRightClick = useCallback(
     (rightIdx: number) => {

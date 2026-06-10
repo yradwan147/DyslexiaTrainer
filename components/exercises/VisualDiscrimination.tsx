@@ -255,6 +255,8 @@ export function VisualDiscrimination({ config, currentTrialIndex, onTrialComplet
   const [optionStates, setOptionStates] = useState<OptionState[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
+  // Count puzzles answered correctly on the first attempt (real per-run score numerator).
+  const firstTryCorrectRef = useRef<number>(0);
 
   // Get current puzzle configuration
   const puzzleConfig = sessionPuzzles[currentPuzzle];
@@ -270,6 +272,7 @@ export function VisualDiscrimination({ config, currentTrialIndex, onTrialComplet
     setCurrentPuzzle(0);
     setOptionStates(puzzleConfig.options.map(() => ({ eliminated: false, selected: false })));
     setShowSuccess(false);
+    firstTryCorrectRef.current = 0;
     startTimeRef.current = Date.now();
   }, [currentTrialIndex]);
 
@@ -281,11 +284,14 @@ export function VisualDiscrimination({ config, currentTrialIndex, onTrialComplet
       // Session complete!
       onTrialComplete({
         trial_index: currentTrialIndex,
-        user_response: JSON.stringify({ 
-          puzzlesCompleted: PUZZLES_PER_SESSION
+        user_response: JSON.stringify({
+          puzzlesCompleted: PUZZLES_PER_SESSION,
+          correctPuzzles: firstTryCorrectRef.current,
         }),
         response_time_ms: Date.now() - startTimeRef.current,
         is_correct: true,
+        score_correct: firstTryCorrectRef.current,
+        score_total: PUZZLES_PER_SESSION,
         is_timed_out: false,
         is_skipped: false,
         started_at: new Date(startTimeRef.current).toISOString(),
@@ -304,6 +310,10 @@ export function VisualDiscrimination({ config, currentTrialIndex, onTrialComplet
     const isCorrect = index === puzzleConfig.correctIndex;
 
     if (isCorrect) {
+      // First-try correct = no option eliminated before this correct click.
+      if (!optionStates.some(s => s.eliminated)) {
+        firstTryCorrectRef.current += 1;
+      }
       // Show success and advance
       setShowSuccess(true);
       setOptionStates(prev => prev.map((s, i) => 
