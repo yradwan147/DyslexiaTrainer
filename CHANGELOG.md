@@ -2,6 +2,12 @@
 
 All notable changes to the DyslexiaTrainer project will be documented in this file.
 
+## [2.2.1] - 2026-06-10
+
+### Added — Manual level override
+
+Researchers can manually set a child's level per exercise from the participant detail page (Progress Summary) — for Coherent Motion this sets the resume coherence (%). The override writes the child's tracked level, and automatic advancement (70% rule) continues from the value set. Added an admin-only `PATCH /api/exercise-progress`.
+
 ## [2.2.0] - 2026-06-10
 
 ### Changed — Automatic difficulty progression

@@ -65,6 +65,8 @@ Difficulty **advances automatically**, tracked per child per exercise — you do
 - A score below 70% keeps the same level (it never drops). Levels are capped at **15**.
 - **Coherent Motion Detection** is the exception — it has no fixed levels. Each session resumes at the coherence the child reached at the end of their previous session (starting at 30% the first time).
 
+You can also **manually override** a child's level at any time from the **participant detail page** (Progress Summary) — type a new level (or coherence % for Coherent Motion) and click **Set**. It applies to that child's next session, and automatic advancement continues from the value you set.
+
 ### 4. Participants
 
 Shows all children enrolled in this study. Click **View Details** to see a child's full analytics.
@@ -121,7 +123,7 @@ From **Participants**, click on any child to see:
 
 1. **Study progress** — Sessions completed vs. target, with progress bar
 2. **Session history** — Table showing every session: number, date, status, exercises completed, duration
-3. **Progress summary** — The difficulty level each exercise was most recently trained at
+3. **Progress summary** — Each exercise's current level (the level that applies to the child's next session), editable so you can manually override it
 4. **Per-exercise charts:**
    - Accuracy over time
    - Reaction time trends

@@ -65,6 +65,7 @@ export function initializeDatabase(): void {
     ['sessions_per_week', 'ALTER TABLE studies ADD COLUMN sessions_per_week INTEGER DEFAULT NULL'],
     ['min_days_between_sessions', 'ALTER TABLE studies ADD COLUMN min_days_between_sessions INTEGER DEFAULT NULL'],
     ['template_exercise_level', 'ALTER TABLE session_template_exercises ADD COLUMN difficulty_level INTEGER DEFAULT 1'],
+    ['exercise_runs_session_id', 'ALTER TABLE exercise_runs ADD COLUMN session_id INTEGER REFERENCES sessions(id) ON DELETE SET NULL'],
   ];
   for (const [name, sql] of migrations) {
     try {

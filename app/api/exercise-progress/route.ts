@@ -118,3 +118,49 @@ export async function POST(request: NextRequest) {
     });
   }
 }
+
+// PATCH: researcher/admin manual override of a child's current level (or coherent
+// motion's resume coherence). Auto-advancement then continues from this value.
+export async function PATCH(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role === 'child') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const db = getDb();
+  const { user_id, exercise_id, current_level } = await request.json();
+  if (!user_id || !exercise_id || current_level === undefined || current_level === null) {
+    return NextResponse.json({ error: 'user_id, exercise_id and current_level are required' }, { status: 400 });
+  }
+
+  const participant = db.prepare(
+    'SELECT study_id FROM participants WHERE user_id = ? LIMIT 1'
+  ).get(user_id) as { study_id: number } | undefined;
+  if (!participant) {
+    return NextResponse.json({ error: 'No study assignment found' }, { status: 400 });
+  }
+  const studyId = participant.study_id;
+
+  // Coherent motion stores a coherence (1–100); other exercises a level (1–15).
+  const max = exercise_id === 'coherent_motion' ? 100 : 15;
+  const value = Math.max(1, Math.min(max, Math.round(Number(current_level))));
+  if (!Number.isFinite(value)) {
+    return NextResponse.json({ error: 'current_level must be a number' }, { status: 400 });
+  }
+
+  const existing = db.prepare(
+    'SELECT id FROM exercise_progress WHERE user_id = ? AND study_id = ? AND exercise_id = ?'
+  ).get(user_id, studyId, exercise_id) as { id: number } | undefined;
+
+  if (existing) {
+    db.prepare(
+      'UPDATE exercise_progress SET current_level = ? WHERE user_id = ? AND study_id = ? AND exercise_id = ?'
+    ).run(value, user_id, studyId, exercise_id);
+  } else {
+    db.prepare(
+      'INSERT INTO exercise_progress (user_id, study_id, exercise_id, current_level, total_sessions_completed) VALUES (?, ?, ?, ?, 0)'
+    ).run(user_id, studyId, exercise_id, value);
+  }
+
+  return NextResponse.json({ current_level: value });
+}

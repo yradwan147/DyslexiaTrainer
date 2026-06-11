@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -60,9 +60,11 @@ export default function ParticipantDetailPage() {
   const [sessions, setSessions] = useState<SessionData[]>([]);
   const [studyInfo, setStudyInfo] = useState<StudyInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [levelEdits, setLevelEdits] = useState<Record<string, string>>({});
+  const [savingLevel, setSavingLevel] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch(`/api/analytics/progress?userId=${userId}`)
+  const loadData = useCallback(() => {
+    return fetch(`/api/analytics/progress?userId=${userId}`)
       .then(res => res.json())
       .then(data => {
         setUser(data.user);
@@ -72,9 +74,28 @@ export default function ParticipantDetailPage() {
         setSessions(data.sessions || []);
         setStudyInfo(data.studyInfo || null);
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch(console.error);
   }, [userId]);
+
+  useEffect(() => {
+    loadData().finally(() => setLoading(false));
+  }, [loadData]);
+
+  // Researcher manual override of a child's level (or coherence for coherent motion).
+  const saveLevel = async (exerciseId: string, value: number) => {
+    setSavingLevel(exerciseId);
+    try {
+      await fetch('/api/exercise-progress', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: Number(userId), exercise_id: exerciseId, current_level: value }),
+      });
+      setLevelEdits(prev => { const next = { ...prev }; delete next[exerciseId]; return next; });
+      await loadData();
+    } finally {
+      setSavingLevel(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -218,25 +239,42 @@ export default function ParticipantDetailPage() {
 
       {/* Progress Summary */}
       <Card>
-        <h2 className="text-xl font-bold text-slate-800 mb-4">Progress Summary</h2>
+        <h2 className="text-xl font-bold text-slate-800 mb-1">Progress Summary</h2>
+        <p className="text-sm text-slate-400 mb-4">
+          Difficulty advances automatically (one level per session at 70%+). You can override a child&apos;s
+          level here — it applies to their next session and auto-advancement continues from the value you set.
+          For Coherent Motion the value is the resume coherence (%).
+        </p>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {Object.entries(EXERCISE_NAMES).map(([id, name]) => {
             const exerciseRuns = runsByExercise[id] || [];
-            // Researcher-set fixed level: show the level the child actually trained at
-            // most recently (= the difficulty configured on the study's session template).
-            const latestLevel = exerciseRuns.length > 0
-              ? exerciseRuns[exerciseRuns.length - 1].difficulty_level
-              : null;
-            // Coherent motion has no level — its tracked value is the coherence (%).
-            const display = latestLevel === null
-              ? '—'
-              : id === 'coherent_motion' ? `${latestLevel}% coh` : `Lv ${latestLevel}`;
+            const isCoherent = id === 'coherent_motion';
+            const maxVal = isCoherent ? 100 : 15;
+            // Authoritative current level for the next session (exercise_progress).
+            const effective = progress.find(p => p.exercise_id === id)?.current_level ?? (isCoherent ? 30 : 1);
+            const value = levelEdits[id] ?? String(effective);
+            const changed = levelEdits[id] !== undefined && levelEdits[id] !== '' && Number(levelEdits[id]) !== effective;
             return (
               <div key={id} className="bg-slate-50 rounded-xl p-4 text-center">
                 <p className="text-sm font-medium text-slate-600">{name}</p>
-                <p className="text-2xl font-bold text-slate-800 mt-1">
-                  {display}
-                </p>
+                <div className="flex items-center justify-center gap-1 mt-2">
+                  <input
+                    type="number"
+                    value={value}
+                    min={1}
+                    max={maxVal}
+                    onChange={(e) => setLevelEdits(prev => ({ ...prev, [id]: e.target.value }))}
+                    className="w-16 px-2 py-1 border rounded text-center text-lg font-bold"
+                  />
+                  <span className="text-xs text-slate-400">{isCoherent ? '% coh' : 'lvl'}</span>
+                </div>
+                <button
+                  onClick={() => saveLevel(id, Math.max(1, Math.min(maxVal, Math.round(Number(value)) || 1)))}
+                  disabled={!changed || savingLevel === id}
+                  className="mt-2 text-xs px-3 py-1 rounded bg-primary-100 text-primary-700 hover:bg-primary-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {savingLevel === id ? 'Saving…' : 'Set'}
+                </button>
                 <p className="text-xs text-slate-400 mt-1">
                   {exerciseRuns.length} runs
                 </p>
