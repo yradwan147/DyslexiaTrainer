@@ -21,9 +21,7 @@
    - **Target Sessions** — Total number of sessions each child should complete (e.g. 15)
    - **Sessions/Day** — How many sessions a child can do per day (default: 1)
    - **Duration (min)** — Expected session duration in minutes
-4. **Select exercises** — Click the exercise chips at the bottom to add them to the study. For each exercise you can set:
-   - **Level** — Starting difficulty level (1-5)
-   - **Trials** — Number of trials per exercise
+4. **Select exercises** — Click the exercise chips at the bottom to add them to the study. For each exercise you can set the number of **Trials**. (Difficulty is not set here — every exercise starts at Level 1 and advances automatically; see *Difficulty Levels* below.)
 5. Click **Create Study**
 
 > The exercises you select become the study's first **Session Template**. You can add more templates later from the study configuration page.
@@ -54,16 +52,18 @@ Session templates define which exercises children do in each session. Most studi
 - **Add exercises** by clicking the exercise chips below the list
 - **Remove exercises** with the ✕ button
 - **Reorder exercises** with the ↑ ↓ arrows
-- **Change the difficulty level** by editing the **Level** number next to each exercise (1–15)
 - **Change trial count** by editing the **Trials** number next to each exercise
 - **Add a new session type** with the "+ Add Session Type" button
 - **Delete a session type** with the link at the bottom (only if more than one exists)
 
 ### 3. Difficulty Levels
 
-Difficulty is **fixed per exercise** and set by you in each Session Template (the **Level** field). A child always trains at the level you configure — it does **not** change automatically based on performance.
+Difficulty **advances automatically**, tracked per child per exercise — you don't set it manually.
 
-To change a child's difficulty, edit the **Level** for that exercise in the template and save. The new level applies to that child's next session. (The same difficulty level always produces the same exercise content, so changing the level is how you give a child new/harder material.)
+- Every exercise starts at **Level 1**.
+- After a session where the child scores **70% or higher** on an exercise, that exercise moves up **one level** for their next session.
+- A score below 70% keeps the same level (it never drops). Levels are capped at **15**.
+- **Coherent Motion Detection** is the exception — it has no fixed levels. Each session resumes at the coherence the child reached at the end of their previous session (starting at 30% the first time).
 
 ### 4. Participants
 
@@ -106,9 +106,10 @@ When a child logs in, here's what they see:
 5. They're returned to the dashboard
 
 ### Difficulty levels:
-- Difficulty is fixed per exercise, set by the researcher in each Session Template
-- A child always trains at the configured level until you change it — levels do not change automatically, and children don't choose difficulty
-- The same level always produces the same exercise content (deterministic), which keeps difficulty consistent across children and sessions
+- Difficulty advances automatically, tracked per child per exercise — children don't choose difficulty
+- Every exercise starts at Level 1 and moves up one level the session after the child scores 70%+ (a lower score holds the level; it never drops; capped at Level 15)
+- Coherent Motion is the exception: each session resumes at the coherence reached at the end of the previous session
+- A given level always produces the same exercise content (deterministic), so a level change is what gives the child new material
 
 ---
 
@@ -167,7 +168,7 @@ Exported data includes trial-level detail: every response, reaction time, correc
 ## Tips
 
 - **Start simple** — Create a study with 1 template and a few exercises first. You can always add more templates later.
-- **Set each child's level deliberately** — Difficulty is fixed per exercise in the Session Template. Choose an appropriate starting level per exercise, and raise it in the template when a child is ready for harder material.
+- **Difficulty takes care of itself** — Every exercise starts at Level 1 and advances automatically when a child scores 70%+ in a session, so each child progresses at their own pace. Watch progression on the participant detail page.
 - **Check progress regularly** — The participant detail page gives you real-time insight into each child's performance.
 - **Lock your study** before data collection begins to prevent accidental configuration changes.
 - **Sessions per day > 1** — Useful for intensive training protocols. Templates cycle across sessions, so with 2 templates and 2 sessions/day, children alternate between template types each session.

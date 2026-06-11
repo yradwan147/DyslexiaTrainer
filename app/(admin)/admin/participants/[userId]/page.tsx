@@ -227,11 +227,15 @@ export default function ParticipantDetailPage() {
             const latestLevel = exerciseRuns.length > 0
               ? exerciseRuns[exerciseRuns.length - 1].difficulty_level
               : null;
+            // Coherent motion has no level — its tracked value is the coherence (%).
+            const display = latestLevel === null
+              ? '—'
+              : id === 'coherent_motion' ? `${latestLevel}% coh` : `Lv ${latestLevel}`;
             return (
               <div key={id} className="bg-slate-50 rounded-xl p-4 text-center">
                 <p className="text-sm font-medium text-slate-600">{name}</p>
                 <p className="text-2xl font-bold text-slate-800 mt-1">
-                  {latestLevel !== null ? `Lv ${latestLevel}` : '—'}
+                  {display}
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
                   {exerciseRuns.length} runs

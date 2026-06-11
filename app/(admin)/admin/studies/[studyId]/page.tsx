@@ -230,27 +230,6 @@ export default function StudyDetailPage() {
     await fetchAll();
   };
 
-  // Update exercise difficulty level in template (researcher-set fixed level)
-  const updateExerciseLevel = async (templateId: number, exerciseId: string, level: number) => {
-    const template = templates.find(t => t.id === templateId);
-    if (!template) return;
-
-    const newExercises = template.exercises.map(e => ({
-      exercise_id: e.exercise_id,
-      exercise_version: e.exercise_version,
-      trial_count: e.trial_count,
-      difficulty_level: e.exercise_id === exerciseId ? level : e.difficulty_level,
-      display_order: e.display_order,
-    }));
-
-    await fetch('/api/session-templates', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: templateId, exercises: newExercises }),
-    });
-    await fetchAll();
-  };
-
   // Move exercise up/down in template
   const moveExercise = async (templateId: number, exerciseId: string, direction: 'up' | 'down') => {
     const template = templates.find(t => t.id === templateId);
@@ -422,17 +401,6 @@ export default function StudyDetailPage() {
                       {EXERCISE_NAMES[ex.exercise_id as ExerciseId] || ex.exercise_id}
                     </span>
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-slate-500">Level:</label>
-                      <input
-                        type="number"
-                        value={ex.difficulty_level}
-                        onChange={(e) => updateExerciseLevel(activeTemplate.id, ex.exercise_id, parseInt(e.target.value) || 1)}
-                        className="w-16 px-2 py-1 border rounded text-sm"
-                        min="1"
-                        max="15"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
                       <label className="text-sm text-slate-500">Trials:</label>
                       <input
                         type="number"
@@ -500,14 +468,18 @@ export default function StudyDetailPage() {
         )}
       </Card>
 
-      {/* Section 3: Difficulty Levels (researcher-set, fixed) */}
+      {/* Section 3: Difficulty Levels (automatic progression) */}
       <Card>
         <h2 className="text-xl font-bold text-slate-800 mb-4">Difficulty Levels</h2>
         <p className="text-slate-500">
-          Difficulty is <span className="font-medium">fixed per exercise</span> and set by you in
-          each <span className="font-medium">Session Template</span> above (the <span className="font-medium">Level</span> field).
-          A child always trains at the level you configure; it does not change automatically based on
-          performance. To change a child&apos;s difficulty, edit the Level in the template and save.
+          Difficulty <span className="font-medium">advances automatically</span>, tracked per child per exercise.
+          Every exercise starts at <span className="font-medium">Level 1</span>, and moves up one level in the next
+          session whenever the child scores <span className="font-medium">70% or higher</span> that session. A lower
+          score keeps the same level (it never drops). Levels are capped at 15.
+        </p>
+        <p className="text-slate-500 mt-2">
+          <span className="font-medium">Coherent Motion Detection</span> is the exception: it has no fixed levels —
+          each session resumes at the coherence the child reached at the end of the previous session.
         </p>
       </Card>
 

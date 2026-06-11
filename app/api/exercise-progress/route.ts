@@ -54,7 +54,15 @@ export async function POST(request: NextRequest) {
 
   const db = getDb();
   const body = await request.json();
-  const { exercise_id, correct_count, total_trials, increment_level } = body;
+  const { exercise_id, correct_count, total_trials, ending_coherence } = body;
+
+  // Auto-advancement policy:
+  // - Every exercise starts at Level 1 and advances one level the session after the
+  //   child scores >= 70% (advance-only; a lower score keeps the same level).
+  // - Coherent motion is the exception: it has no discrete level — the next session
+  //   resumes at the coherence (%) the staircase ended on, stored in current_level.
+  const ADVANCE_THRESHOLD = 0.70;
+  const MAX_LEVEL = 15;
   const userId = Number(session.user.id);
 
   // Find the user's study
@@ -73,12 +81,16 @@ export async function POST(request: NextRequest) {
     'SELECT * FROM exercise_progress WHERE user_id = ? AND study_id = ? AND exercise_id = ?'
   ).get(userId, studyId, exercise_id) as { current_level: number; total_sessions_completed: number } | undefined;
 
-  const currentLevel = existing?.current_level ?? 1;
-  // Difficulty level is researcher-set and fixed per exercise on the session template
-  // (see session_template_exercises.difficulty_level). It must NOT auto-advance, so the
-  // level is never changed here — this endpoint only records session-completion tracking.
-  const newLevel = currentLevel;
-  void increment_level;
+  let newLevel: number;
+  if (exercise_id === 'coherent_motion') {
+    // Carry over the ending coherence (1–100). Fall back to the stored value, then 30.
+    const coh = typeof ending_coherence === 'number' ? ending_coherence : (existing?.current_level ?? 30);
+    newLevel = Math.max(1, Math.min(100, Math.round(coh)));
+  } else {
+    const base = existing?.current_level ?? 1;
+    const accuracy = total_trials > 0 ? correct_count / total_trials : 0;
+    newLevel = (accuracy >= ADVANCE_THRESHOLD && base < MAX_LEVEL) ? base + 1 : base;
+  }
 
   // Upsert progress
   if (existing) {

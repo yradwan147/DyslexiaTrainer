@@ -30,7 +30,11 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFeedback, setShowFeedback] = useState<boolean | null>(null);
   const [trialCount, setTrialCount] = useState(0);
-  const [currentCoherence, setCurrentCoherence] = useState(INITIAL_COHERENCE);
+  // Resume the staircase where the previous session ended (carried over via config),
+  // falling back to the default starting coherence on the very first session.
+  const [currentCoherence, setCurrentCoherence] = useState(
+    typeof config.start_coherence === 'number' ? config.start_coherence : INITIAL_COHERENCE
+  );
   const [canvasSize, setCanvasSize] = useState<{ width: number; height: number }>(() => {
     if (typeof window !== 'undefined') {
       return {
@@ -100,22 +104,21 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
     // Show feedback
     setShowFeedback(isCorrect);
     
-    // Adjust coherence based on staircase method
+    // Adjust coherence based on staircase method (correct -> harder/lower).
+    const nextCoherence = isCorrect
+      ? Math.max(1, currentCoherence - COHERENCE_STEP)
+      : Math.min(100, currentCoherence + COHERENCE_STEP);
     setTimeout(() => {
-      if (isCorrect) {
-        // Decrease coherence (make it harder) by 1%
-        setCurrentCoherence(prev => Math.max(1, prev - COHERENCE_STEP));
-      } else {
-        // Increase coherence (make it easier) by 1%
-        setCurrentCoherence(prev => Math.min(100, prev + COHERENCE_STEP));
-      }
-      
+      setCurrentCoherence(nextCoherence);
+
       setShowFeedback(null);
       setTrialCount(prev => prev + 1);
-      
+
       onTrialComplete({
         trial_index: currentTrialIndex,
-        user_response: side,
+        // Record the response and the coherence the staircase moves to after this
+        // trial; the last trial's value is where the next session resumes.
+        user_response: JSON.stringify({ response: side, coherence: nextCoherence }),
         response_time_ms: responseTime,
         is_correct: isCorrect,
         is_timed_out: false,
@@ -239,7 +242,7 @@ export function CoherentMotion({ config, currentTrialIndex, onTrialComplete }: E
       if (currentTime > STIMULUS_DURATION_MS && !hasResponded) {
         onTrialComplete({
           trial_index: currentTrialIndex,
-          user_response: '',
+          user_response: JSON.stringify({ response: '', coherence: coherence_percent }),
           response_time_ms: STIMULUS_DURATION_MS,
           is_correct: false,
           is_timed_out: true,

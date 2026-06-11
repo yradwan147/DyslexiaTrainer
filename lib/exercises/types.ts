@@ -5,6 +5,9 @@ export interface ExerciseConfig {
   exercise_version: string;
   difficulty_level: number;
   training_run_index?: number;
+  // Coherent motion only: coherence (%) to resume the staircase at (carried over
+  // from where the previous session ended). Defaults to 30 when not provided.
+  start_coherence?: number;
   name: string;
   description: string;
   trials: TrialConfig[];

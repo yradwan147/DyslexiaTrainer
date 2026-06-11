@@ -2,6 +2,17 @@
 
 All notable changes to the DyslexiaTrainer project will be documented in this file.
 
+## [2.2.0] - 2026-06-10
+
+### Changed — Automatic difficulty progression
+
+Replaced the researcher-set fixed level (2.1.0) with automatic per-session progression, per the research team's request:
+
+- Every exercise starts at **Level 1** (tracked per child per exercise). After a session where the child scores **≥ 70%**, that exercise advances **one level** for the next session. A lower score holds the level (advance-only, never drops); capped at Level 15.
+- **Coherent Motion** is the exception: it has no discrete levels — the next session resumes at the coherence (%) the staircase ended on (first session starts at 30%). The ending coherence is now persisted, and each per-trial coherence is recorded.
+- Removed the per-exercise **Level** inputs from the study editor and quick-create form (difficulty is now automatic); the *Difficulty Levels* panel and researcher guide explain the new rule.
+- Advancement relies on the real per-exercise accuracy added in 2.1.0.
+
 ## [2.1.0] - 2026-06-09
 
 ### Fixed — Exercises stuck on Level 1 across sessions

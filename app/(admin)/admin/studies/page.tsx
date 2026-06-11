@@ -314,16 +314,6 @@ export default function StudiesPage() {
                 <div key={ex.exercise_id} className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl">
                   <span className="flex-1 font-medium">{EXERCISE_NAMES[ex.exercise_id as ExerciseId]}</span>
                   <div className="flex items-center gap-2">
-                    <label className="text-sm text-slate-500">Level:</label>
-                    <select
-                      value={ex.difficulty}
-                      onChange={(e) => handleExerciseChange(ex.exercise_id, 'difficulty', parseInt(e.target.value))}
-                      className="px-2 py-1 border rounded"
-                    >
-                      {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2">
                     <label className="text-sm text-slate-500">Trials:</label>
                     <input
                       type="number"

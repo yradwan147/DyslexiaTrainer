@@ -104,6 +104,11 @@ export default function SessionPage() {
         config.training_run_index = exercise.current_level;
       }
 
+      // For coherent motion, current_level carries the coherence (%) to resume at.
+      if (exercise.exercise_id === 'coherent_motion') {
+        config.start_coherence = exercise.current_level;
+      }
+
       setCurrentConfig(config);
       setPhase('exercise');
     } catch (error) {
@@ -151,8 +156,20 @@ export default function SessionPage() {
       // Non-critical, continue to next exercise
     }
 
-    // Record session-completion tracking (non-critical). Difficulty level is
-    // researcher-set and fixed, so this no longer changes the level.
+    // Advance difficulty for next session (non-critical). Normal exercises advance a
+    // level when accuracy >= 70%; coherent motion instead carries over the coherence
+    // the staircase ended on (the last trial's reported coherence).
+    let endingCoherence: number | undefined;
+    if (currentExercise.exercise_id === 'coherent_motion') {
+      for (let i = results.length - 1; i >= 0; i--) {
+        try {
+          const parsed = JSON.parse(results[i].user_response) as { coherence?: number };
+          if (typeof parsed.coherence === 'number') { endingCoherence = parsed.coherence; break; }
+        } catch {
+          // not JSON; keep looking
+        }
+      }
+    }
     try {
       await fetch('/api/exercise-progress', {
         method: 'POST',
@@ -161,6 +178,7 @@ export default function SessionPage() {
           exercise_id: currentExercise.exercise_id,
           correct_count: correctCount,
           total_trials: totalTrials,
+          ending_coherence: endingCoherence,
         }),
       });
     } catch {
